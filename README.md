@@ -1,5 +1,7 @@
 ### Real Time Kinematics Base Station
-Hardware: Sparkfun ESP32 Thing Plus + SparkFun GPS-RTK-SMA Breakout - ZED-F9P (Qwiic)
+Hardware:   - Sparkfun ESP32 Thing Plus 
+            - SparkFun GPS-RTK-SMA Breakout - ZED-F9P (Qwiic)
+            - ublox ANN-MB1 antenna
 
 To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
 
