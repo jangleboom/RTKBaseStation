@@ -45,7 +45,7 @@
 #include <config.h>
 #include <WiFiManager.h>
 #include <WiFi.h>
-#include "secrets.h"
+#include <secrets.h> // You need to create your own header file, like discribed in README.md
 
 String deviceName = getDeviceName(DEVICE_TYPE);
 
