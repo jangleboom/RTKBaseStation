@@ -9,7 +9,7 @@ Infrastructure:
 * free line of sight between antenna (horizontal placed) an sky
 * high-precision ECEF coordinates of the location of the antenna (put it into the code)
 
-To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
+To connect to a caster you need to create a secrets.h file in your `lib/` dir with your credentials that looks like this:
 
 ````
 #ifndef SECRETS_H
