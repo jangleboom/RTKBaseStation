@@ -14,7 +14,8 @@
  * <br>
  * @date    2022/05/09
  * 
- * @todo  
+ * @todo    - first check if myGNSS is getting data BEFORE establish the caster connection,
+ *            otherwise they will ban our IP for 4 hours minimum
  *        
  * @note    How to handle WiFi: 
  *           - Push the button 
@@ -283,7 +284,6 @@ void beginServing() {
         if (millis() - lastSentRTCM_ms > maxTimeBeforeHangup_ms) {
             DEBUG_SERIAL.println(F("RTCM timeout. Disconnecting..."));
             ntripCaster.stop();
-            return;
     }
 
     vTaskDelay(10);
@@ -370,7 +370,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
                 ntripCaster.stop();
                 return;
                 }
-            vTaskDelay(10);
+            delay(10);
             }
 
             //Check reply
@@ -413,7 +413,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
                 return;
         }
 
-        vTaskDelay(10);
+        delay(10);
 
         //Report some statistics every 250
         if (millis() - lastReport_ms > 250) {
