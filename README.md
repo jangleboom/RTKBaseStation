@@ -5,7 +5,7 @@ Hardware used:
 * ublox ANN-MB1 antenna
 
 Infrastructure:
-* WiFi (e. g. a personal Hotspot)
+* WiFi (e. g. a personal hotspot)
 * free line of sight between antenna (horizontal placed) an sky
 * high-precision ECEF coordinates of the location of the antenna (put it into the code)
 
