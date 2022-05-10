@@ -4,6 +4,11 @@ Hardware:
 * SparkFun GPS-RTK-SMA Breakout - ZED-F9P (Qwiic)
 * ublox ANN-MB1 antenna
 
+Infrastructure:
+* WiFi (e. g. a personal Hotspot)
+* free line of sight between antenna (horizontal placed) an sky
+* high-precision ECEF coordinates of the location of the antenna (put it into the code)
+
 To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
 
 ````
