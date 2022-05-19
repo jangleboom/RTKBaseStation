@@ -16,6 +16,8 @@
  * 
  * @todo    - first check if myGNSS is getting data BEFORE establish the caster connection,
  *            otherwise they will ban our IP for 4 hours minimum
+ *          - write func for converting lat/long hight into X/Y/Z coords
+ *          - make coords input dynamically on server page
  *        
  * @note    How to handle WiFi: 
  *           - Push the button 
@@ -186,7 +188,7 @@ void setupGNSS() {
   //will be very confused and fail to generate correction data because, well, you aren't at SparkFun...
   //See this tutorial on getting PPP coordinates: https://learn.sparkfun.com/tutorials/how-to-build-a-diy-gnss-reference-station/all
   // response &= myGNSS.setStaticPosition(-128020830, -80, -471680384, -70, 408666581, 10);  //With high precision 0.1mm parts
-  response &= myGNSS.setStaticPosition(377515946, 60, 493793830, 30, 142561157, 10);  //With high precision 0.1mm parts
+  response &= myGNSS.setStaticPosition(378251992, 50, 87338664, 10, 504375059, 30);  //With high precision 0.1mm parts
   if (response == false) {
     DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
     while (1)
@@ -194,11 +196,12 @@ void setupGNSS() {
   } else
     DEBUG_SERIAL.println(F("Static position set"));
 /*ECEF coordinates: Example Brieslang
-Get LLH coords from map: https://www.gpskoordinaten.de/ Breitengrad: 52.601314 | Längengrad: 13.001833 | Höhe: 39 Meter
+Get LLH coords from map: https://www.gpskoordinaten.de/ (and verify the coords on new Google Maps cards)
+Breitengrad : 52.6013104707097 | Längengrad : 13.001770401773417 | Höhe : 39 Meter
 Convert LLH coords into ECEF XYZ coords: https://tool-online.com/en/coordinate-converter.php
-WGS84_XYZ (geocentric)  ECEF-X 3775159.466
-WGS84_XYZ (geocentric)  ECEF-Y 4937938.303
-WGS84_XYZ (geocentric)  ECEF-Z 1425611.571
+WGS84_XYZ (geocentric)  ECEF-X 3782519.925
+WGS84_XYZ (geocentric)  ECEF-Y 873386.641
+WGS84_XYZ (geocentric)  ECEF-Z 5043750.593
 
 after running look here: http://new.rtk2go.com:2101/SNIP::STATUS
 */
