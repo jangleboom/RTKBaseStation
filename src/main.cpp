@@ -242,7 +242,7 @@ void beginServing() {
         //Wait for response
         unsigned long timeout = millis();
         while (ntripCaster.available() == 0) {
-          if (millis() - timeout > 5000) {
+          if (millis() - timeout > CONNECTION_TIMEOUT_MS) {
             DEBUG_SERIAL.println(F("Caster timed out!"));
             ntripCaster.stop();
             return;
