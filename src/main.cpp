@@ -18,6 +18,8 @@
  *            otherwise they will ban our IP for 4 hours minimum
  *          - write func for converting lat/long hight into X/Y/Z coords
  *          - make coords input dynamically on server page
+ *          - set target accuracy for survey
+ *          - add display and buttons
  *        
  * @note    How to handle WiFi: 
  *           - Push the button 
@@ -138,18 +140,18 @@ void loop() {
  * ****************************************************************************/
 
 void setupGNSS() {
-    if (myGNSS.begin() == false) {
+  if (myGNSS.begin() == false) {
     DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
     while (1) {
-        vTaskDelay(100/portTICK_PERIOD_MS);
+        delay(1000);
         }
-    }
+  }
     
-  myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);  //UBX+RTCM3 is not a valid option so we enable all three.
-
+  myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_RTCM3 | COM_TYPE_NMEA);  //UBX+RTCM3 is not a valid option so we enable all three.
+  // myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save the communications port settings to flash and BBR
   myGNSS.setNavigationFrequency(1);  //Set output in Hz. RTCM rarely benefits from >1Hz.
 
-    //Disable all NMEA sentences
+  //Disable all NMEA sentences
   bool response = true;
   response &= myGNSS.disableNMEAMessage(UBX_NMEA_GGA, COM_PORT_I2C);
   response &= myGNSS.disableNMEAMessage(UBX_NMEA_GSA, COM_PORT_I2C);
@@ -181,122 +183,121 @@ void setupGNSS() {
   } else
     DEBUG_SERIAL.println(F("RTCM sentences enabled"));
 
-  //-1280208.308,-4716803.847,4086665.811 is SparkFun HQ so...
-  //Units are cm with a high precision extension so -1234.5678 should be called: (-123456, -78)
-  //For more infomation see Example12_setStaticPosition
-  //Note: If you leave these coordinates in place and setup your antenna *not* at SparkFun, your receiver
-  //will be very confused and fail to generate correction data because, well, you aren't at SparkFun...
-  //See this tutorial on getting PPP coordinates: https://learn.sparkfun.com/tutorials/how-to-build-a-diy-gnss-reference-station/all
-  // response &= myGNSS.setStaticPosition(-128020830, -80, -471680384, -70, 408666581, 10);  //With high precision 0.1mm parts
-  response &= myGNSS.setStaticPosition(378251992, 50, 87338664, 10, 504375059, 30);  //With high precision 0.1mm parts
-  if (response == false) {
-    DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
-    while (1)
-      ;
-  } else
-    DEBUG_SERIAL.println(F("Static position set"));
-/*ECEF coordinates: Example Brieslang
-Get LLH coords from map: https://www.gpskoordinaten.de/ (and verify the coords on new Google Maps cards)
-Breitengrad : 52.6013104707097 | Längengrad : 13.001770401773417 | Höhe : 39 Meter
-Convert LLH coords into ECEF XYZ coords: https://tool-online.com/en/coordinate-converter.php
-WGS84_XYZ (geocentric)  ECEF-X 3782519.925
-WGS84_XYZ (geocentric)  ECEF-Y 873386.641
-WGS84_XYZ (geocentric)  ECEF-Z 5043750.593
+  if (STATIC_POSITION == true) {
+    // TODO: write a func to generate that input!
+    // Latitude, Longitude, Altitude input:
+    response &= myGNSS.setStaticPosition(LATITUDE, LATITUDE_HP, LONGITUDE, LONGITUDE_HP, ALTITUDE, ALTITUDE_HP, true); 
+    // Earth-centered corrdinates:
+    //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
+    if (response == false) {
+      DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
+      while (1)
+        ;
+    } else {
+      DEBUG_SERIAL.println(F("Static position set"));
+    }
 
-after running look here: http://new.rtk2go.com:2101/SNIP::STATUS
+  } else 
+  {
+    //Alternatively to setting a static position, you could do a survey-in
+    //but it takes much longer to start generating RTCM data. See Example4_BaseWithLCD
+    // Check if Survey is in Progress before initiating one
+    // From v2.0, the data from getSurveyStatus (UBX-NAV-SVIN) is returned in UBX_NAV_SVIN_t packetUBXNAVSVIN
+    // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
+    // You can either read the data from packetUBXNAVSVIN directly
+    // or can use the helper functions: getSurveyInActive; getSurveyInValid; getSurveyInObservationTime; and getSurveyInMeanAccuracy
+    response &= myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000ms timeout (request can take a long time)
+    if (response == false)
+    {
+      DEBUG_SERIAL.println(F("Failed to get Survey In status. Freezing."));
+      while (1)
+        ; //Freeze
+    }
+
+    if (myGNSS.getSurveyInActive() == true) // Use the helper function
+    {
+      DEBUG_SERIAL.println(F("Survey already in progress."));
+      // lcd.setCursor(0, 2);
+      // lcd.print(F("Survey already going"));
+    }
+    else
+    {
+      //Start survey
+      response = myGNSS.enableSurveyMode(60, 5.000); //Enable Survey in, 60 seconds, 5.0m
+      if (response == false)
+      {
+        DEBUG_SERIAL.println(F("Survey start failed"));
+        // lcd.setCursor(0, 3);
+        // lcd.print(F("Survey start failed. Freezing."));
+        while (1)
+          ;
+      }
+    DEBUG_SERIAL.println(F("Survey started. This will run until 60s has passed and less than 5m accuracy is achieved."));
+    }
+
+    //Begin waiting for survey to complete
+    while (myGNSS.getSurveyInValid() == false) // Call the helper function
+    {
+      // if (Serial.available())
+      // {
+      //   byte incoming = Serial.read();
+      //   if (incoming == 'x')
+      //   {
+      //     //Stop survey mode
+      //     response = myGNSS.disableSurveyMode(); //Disable survey
+      //     Serial.println(F("Survey stopped"));
+      //     break;
+      //   }
+      // }
+
+      // From v2.0, the data from getSurveyStatus (UBX-NAV-SVIN) is returned in UBX_NAV_SVIN_t packetUBXNAVSVIN
+      // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
+      // You can either read the data from packetUBXNAVSVIN directly
+      // or can use the helper functions: getSurveyInActive; getSurveyInValid; getSurveyInObservationTime; and getSurveyInMeanAccuracy
+      response &= myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000ms timeout (req can take a long time)
+      if (response == true)
+      {
+        Serial.print(F("Time elapsed: "));
+        Serial.print((String)myGNSS.getSurveyInObservationTime()); // Call the helper function
+
+        // lcd.setCursor(0, 1);
+        // lcd.print(F("Elapsed: "));
+        // lcd.print((String)myGNSS.getSurveyInObservationTime()); // Call the helper function
+
+        Serial.print(F(" Accuracy: "));
+        Serial.print((String)myGNSS.getSurveyInMeanAccuracy()); // Call the helper function
+        Serial.println();
+
+        // lcd.setCursor(0, 2);
+        // lcd.print(F("Accuracy: "));
+        // lcd.print((String)myGNSS.getSurveyInMeanAccuracy()); // Call the helper function
+      }
+      else {
+        Serial.println(F("SVIN request failed"));
+      }
+
+      delay(1000);
+    }
+    Serial.println(F("Survey valid!"));
+
+    Serial.println(F("Base survey complete! RTCM now broadcasting."));
+
+    //If you were setting up a full GNSS station, you would want to save these settings.
+    //Because setting an incorrect static position will disable the ability to get a lock, we will skip saving during this example
+    //if (myGNSS.saveConfiguration() == false) //Save the current settings to flash and BBR
+    //  DEBUG_SERIAL.println(F("Module failed to save"));
+  }
+
+
+   
+/* 
+  ECEF coordinates: Example tiny office Brieslang
+  after running look here: http://new.rtk2go.com:2101/SNIP::STATUS
 */
 
-  //Alternatively to setting a static position, you could do a survey-in
-  //but it takes much longer to start generating RTCM data. See Example4_BaseWithLCD
-  //myGNSS.enableSurveyMode(60, 5.000); //Enable Survey in, 60 seconds, 5.0m
 
-  //If you were setting up a full GNSS station, you would want to save these settings.
-  //Because setting an incorrect static position will disable the ability to get a lock, we will skip saving during this example
-  //if (myGNSS.saveConfiguration() == false) //Save the current settings to flash and BBR
-  //  DEBUG_SERIAL.println(F("Module failed to save"));
 
   DEBUG_SERIAL.println(F("Module configuration complete"));
-}
-
-void beginServing() {
-    //Connect if we are not already
-    if (ntripCaster.connected() == false) {
-      DEBUG_SERIAL.printf("Opening socket to %s\n", casterHost);
-
-      if (ntripCaster.connect(casterHost, casterPort) == true)  //Attempt connection
-      {
-        DEBUG_SERIAL.printf("Connected to %s:%d\n", casterHost, casterPort);
-
-        const int SERVER_BUFFER_SIZE = 512;
-        char serverRequest[SERVER_BUFFER_SIZE];
-
-        snprintf(serverRequest,
-                 SERVER_BUFFER_SIZE,
-                 "SOURCE %s /%s\r\nSource-Agent: NTRIP SparkFun u-blox Server v1.0\r\n\r\n",
-                 mountPointPW, mountPoint);
-
-        DEBUG_SERIAL.println(F("Sending server request:"));
-        DEBUG_SERIAL.println(serverRequest);
-        ntripCaster.write(serverRequest, strlen(serverRequest));
-
-        //Wait for response
-        unsigned long timeout = millis();
-        while (ntripCaster.available() == 0) {
-          if (millis() - timeout > CONNECTION_TIMEOUT_MS) {
-            DEBUG_SERIAL.println(F("Caster timed out!"));
-            ntripCaster.stop();
-            return;
-          }
-          vTaskDelay(10);
-        }
-
-        //Check reply
-        bool connectionSuccess = false;
-        char response[512];
-        int responseSpot = 0;
-        while (ntripCaster.available()) {
-          response[responseSpot++] = ntripCaster.read();
-          if (strstr(response, "200") > 0)  //Look for 'ICY 200 OK'
-            connectionSuccess = true;
-          if (responseSpot == 512 - 1)
-            break;
-        }
-        response[responseSpot] = '\0';
-
-        if (connectionSuccess == false) {
-          DEBUG_SERIAL.printf("Failed to connect to Caster: %s", response);
-          return;
-        }
-      }  //End attempt to connect
-      else {
-        DEBUG_SERIAL.println(F("Connection to host failed"));
-        return;
-      }
-    }  //End connected == false
-
-    lastReport_ms = millis();
-    lastSentRTCM_ms = millis();
-
-    //This is the main sending loop. We scan for new ublox data but processRTCM() is where the data actually gets sent out.
-    while (ntripCaster.connected() == true) {
-        myGNSS.checkUblox();  //See if new data is available. Process bytes as they come in.
-
-        //Close socket if we don't have new data for 10s
-        //RTK2Go will ban your IP address if you abuse it. See http://www.rtk2go.com/how-to-get-your-ip-banned/
-        //So let's not leave the socket open/hanging without data
-        if (millis() - lastSentRTCM_ms > maxTimeBeforeHangup_ms) {
-            DEBUG_SERIAL.println(F("RTCM timeout. Disconnecting..."));
-            ntripCaster.stop();
-    }
-
-    vTaskDelay(10);
-
-    //Report some statistics every 250
-    if (millis() - lastReport_ms > 250) {
-        lastReport_ms += 250;
-        DEBUG_SERIAL.printf("Total sent: %d\n", serverBytesSent);
-        }
-    }
 }
 
 // This function gets called from the SparkFun u-blox Arduino Library.
@@ -342,12 +343,16 @@ void task_rtk_wifi_connection(void *pvParameters) {
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     // DEBUG_SERIAL.print(F("task_rtk_wifi_connection setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
+
+    bool connectionSuccess = false;
+    char response[512];
+    int responseSpot = 0;
     
     while (1) {
-        // beginServing();
-            //Connect if we are not already
-        if (ntripCaster.connected() == false) {
-            DEBUG_SERIAL.printf("Opening socket to %s\n", casterHost);
+      // beginServing() func content
+      // Connect if we are not already
+      if (ntripCaster.connected() == false) {
+          DEBUG_SERIAL.printf("Opening socket to %s\n", casterHost);
 
         if (ntripCaster.connect(casterHost, casterPort) == true)  //Attempt connection
         {
@@ -365,23 +370,20 @@ void task_rtk_wifi_connection(void *pvParameters) {
             DEBUG_SERIAL.println(serverRequest);
             ntripCaster.write(serverRequest, strlen(serverRequest));
 
-            //Wait for response
+            // Wait for response
             unsigned long timeout = millis();
             while (ntripCaster.available() == 0) {
             if (millis() - timeout > 5000) {
                 DEBUG_SERIAL.println(F("Caster timed out!"));
                 ntripCaster.stop();
-                return;
+                // return;
                 }
             delay(10);
             }
 
-            //Check reply
-            bool connectionSuccess = false;
-            char response[512];
-            int responseSpot = 0;
+            // Check reply
             while (ntripCaster.available()) {
-            response[responseSpot++] = ntripCaster.read();
+              response[responseSpot++] = ntripCaster.read();
             if (strstr(response, "200") > 0)  //Look for 'ICY 200 OK'
                 connectionSuccess = true;
             if (responseSpot == 512 - 1)
@@ -391,14 +393,14 @@ void task_rtk_wifi_connection(void *pvParameters) {
 
             if (connectionSuccess == false) {
                 DEBUG_SERIAL.printf("Failed to connect to Caster: %s", response);
-                return;
+                // return;
                 }
-            }  //End attempt to connect
+            }  // End attempt to connect
             else {
                 DEBUG_SERIAL.println(F("Connection to host failed"));
-                return;
+                // return;
             }
-        }  //End connected == false
+        }  // End connected == false
 
         lastReport_ms = millis();
         lastSentRTCM_ms = millis();
@@ -413,7 +415,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
             if (millis() - lastSentRTCM_ms > maxTimeBeforeHangup_ms) {
                 DEBUG_SERIAL.println(F("RTCM timeout. Disconnecting..."));
                 ntripCaster.stop();
-                return;
+                // return;
         }
 
         delay(10);
