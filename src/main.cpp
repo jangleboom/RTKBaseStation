@@ -44,17 +44,13 @@
 
 
 #include <Arduino.h>
-#include <Wire.h> // BNO080 and uBlox GNSS
-#include <SparkFun_u-blox_GNSS_Arduino_Library.h>
+#include <Wire.h> // Display and uBlox GNSS
 #include <config.h>
-#include <WiFiManager.h>
-#include <WiFi.h>
 #include <secrets.h> // You need to create your own header file, like discribed in README.md
 
 String deviceName = getDeviceName(DEVICE_TYPE);
 
-WiFiClient ntripCaster;
-//Global Variables
+// ? Avoid Global Variables
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 long lastSentRTCM_ms = 0;            //Time of last data pushed to socket
 int maxTimeBeforeHangup_ms = 10000;  //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
@@ -62,6 +58,24 @@ int maxTimeBeforeHangup_ms = 10000;  //If we fail to get a complete RTCM frame a
 uint32_t serverBytesSent = 0;  //Just a running total
 long lastReport_ms = 0;        //Time of last report of bytes sent
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+/*******************************************************************************
+ *                                 Display
+ * ****************************************************************************/
+#include <Adafruit_I2CDevice.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+
+#define OLED_I2C_ADDR 0x3c
+#define SCREEN_WIDTH 128  // OLED display width, in pixels
+#define SCREEN_HEIGHT 64  // OLED display height, in pixels
+// #define SDA_PIN 4
+// #define SCL_PIN 5
+#define OLED_RESET -1   //   QT-PY / XIAO
+// Global objects
+Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// Prototypes
+void setup_display(void);
 
 /*******************************************************************************
  *                                 Button(s)
@@ -76,35 +90,48 @@ void buttonHandler(Button2 &btn);
 /*******************************************************************************
  *                                 WiFi
  * ****************************************************************************/
+#include <WiFiManager.h>
+#include <WiFi.h>
 
 void setupWiFi(const String& ssid, const String& key);
-
+// Globals
+WiFiClient ntripCaster;
 /*******************************************************************************
  *                                 GNSS
  * ****************************************************************************/
-long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
+#include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 
+long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
+// Globals
 SFE_UBLOX_GNSS myGNSS;
 
 void setupGNSS(void);
 void task_rtk_wifi_connection(void *pvParameters);
 
 void setup() {
+    Wire.begin();
     #ifdef DEBUGGING
     Serial.begin(BAUD);
     while (!Serial) {};
     #endif
-
     DEBUG_SERIAL.print(F("Device name: "));
     DEBUG_SERIAL.println(deviceName);
+   
+    setup_display();
+    display.setCursor(0,10);
+    String greeting = "Hello " + deviceName;
+    display.print(greeting.c_str());
+    display.display();
 
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
 
+
+
+    //wipeEEPROM();
     // TODO: make the WiFi setup a primary task
     EEPROM.begin(400);
-    //wipeEEPROM();
     if (!checkWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);
         DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));
@@ -131,7 +158,6 @@ void loop() {
     aunit::TestRunner::run();
     #endif
     #endif
-
     button.loop();
 }
 
@@ -140,7 +166,7 @@ void loop() {
  * ****************************************************************************/
 
 void setupGNSS() {
-  if (myGNSS.begin() == false) {
+  if (myGNSS.begin(Wire) == false) {
     DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
     while (1) {
         delay(1000);
@@ -223,7 +249,8 @@ void setupGNSS() {
     else
     {
       //Start survey
-      response = myGNSS.enableSurveyMode(60, 5.000); //Enable Survey in, 60 seconds, 5.0m
+      // response = myGNSS.enableSurveyMode(60, 1.000); //Enable Survey in, 60 seconds, 1.0m
+      response = myGNSS.enableSurveyMode(60, DESIRED_ACCURACY_M); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
       if (response == false)
       {
         DEBUG_SERIAL.println(F("Survey start failed"));
@@ -232,7 +259,9 @@ void setupGNSS() {
         while (1)
           ;
       }
-    DEBUG_SERIAL.println(F("Survey started. This will run until 60s has passed and less than 5m accuracy is achieved."));
+    DEBUG_SERIAL.print(F("Survey started. This will run until 60s has passed and less than "));
+    DEBUG_SERIAL.print(DESIRED_ACCURACY_M);
+    DEBUG_SERIAL.println(F(" mm accuracy is achieved."));
     }
 
     //Begin waiting for survey to complete
@@ -257,30 +286,29 @@ void setupGNSS() {
       response &= myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000ms timeout (req can take a long time)
       if (response == true)
       {
-        Serial.print(F("Time elapsed: "));
-        Serial.print((String)myGNSS.getSurveyInObservationTime()); // Call the helper function
+        DEBUG_SERIAL.print(F("Time elapsed: "));
+        DEBUG_SERIAL.print((String)myGNSS.getSurveyInObservationTime()); // Call the helper function
 
         // lcd.setCursor(0, 1);
         // lcd.print(F("Elapsed: "));
         // lcd.print((String)myGNSS.getSurveyInObservationTime()); // Call the helper function
 
-        Serial.print(F(" Accuracy: "));
-        Serial.print((String)myGNSS.getSurveyInMeanAccuracy()); // Call the helper function
-        Serial.println();
+        DEBUG_SERIAL.print(F(" Accuracy: "));
+        DEBUG_SERIAL.println((String)myGNSS.getSurveyInMeanAccuracy()); // Call the helper function
 
         // lcd.setCursor(0, 2);
         // lcd.print(F("Accuracy: "));
         // lcd.print((String)myGNSS.getSurveyInMeanAccuracy()); // Call the helper function
       }
       else {
-        Serial.println(F("SVIN request failed"));
+        DEBUG_SERIAL.println(F("SVIN request failed"));
       }
 
       delay(1000);
     }
-    Serial.println(F("Survey valid!"));
+    DEBUG_SERIAL.println(F("Survey valid!"));
 
-    Serial.println(F("Base survey complete! RTCM now broadcasting."));
+    DEBUG_SERIAL.println(F("Base survey complete! RTCM now broadcasting."));
 
     //If you were setting up a full GNSS station, you would want to save these settings.
     //Because setting an incorrect static position will disable the ability to get a lock, we will skip saving during this example
@@ -335,7 +363,6 @@ void setupWiFi(const String& ssid, const String& key) {
 
 void task_rtk_wifi_connection(void *pvParameters) {
     (void)pvParameters;
-    Wire.begin();
     Wire.setClock(I2C_FREQUENCY_100K);
     setupGNSS();
     // Measure stack size
@@ -440,9 +467,8 @@ void task_rtk_wifi_connection(void *pvParameters) {
 
 
 /*******************************************************************************
- *                                 Further system components
+ *                              Button(s)
  * ****************************************************************************/
-
 
 void buttonHandler(Button2 &btn) 
 {
@@ -452,4 +478,26 @@ void buttonHandler(Button2 &btn)
     wipeEEPROM();
     while (loadWiFiCredsForm()) {};
   }
+}
+
+/*******************************************************************************
+ *                                Display
+ * ****************************************************************************/
+
+void setup_display() {
+  // if (!display.begin()) {
+  if (!display.begin(OLED_I2C_ADDR, true)) {
+    DEBUG_SERIAL.println("Could not find SH110X? Check wiring");
+    while (true) delay(100);
+  } // Address 0x3C default
+ 
+  display.display();
+  delay(1000);
+
+  // Clear the buffer.
+  display.clearDisplay();
+  display.setTextSize(1);
+  //display.drawLine(0, 0, display.width() - 1, 0, SH110X_WHITE);
+  display.setTextColor(SH110X_WHITE, SH110X_BLACK);
+  DEBUG_SERIAL.println(F("Display setup done"));
 }
