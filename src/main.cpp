@@ -48,16 +48,7 @@
 #include <config.h>
 #include <secrets.h> // You need to create your own header file, like discribed in README.md
 
-String deviceName = getDeviceName(DEVICE_TYPE);
-
-// ? Avoid Global Variables
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-long lastSentRTCM_ms = 0;            //Time of last data pushed to socket
-int maxTimeBeforeHangup_ms = 10000;  //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
-
-uint32_t serverBytesSent = 0;  //Just a running total
-long lastReport_ms = 0;        //Time of last report of bytes sent
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+const String deviceName = getDeviceName(DEVICE_TYPE_PREFIX);
 
 /*******************************************************************************
  *                                 Display
@@ -101,12 +92,23 @@ WiFiClient ntripCaster;
  * ****************************************************************************/
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 
+// ? Avoid Global Variables
+long lastSentRTCM_ms = 0;             // Time of last data pushed to socket
+int maxTimeBeforeHangup_ms = 10000;   /* If we fail to get a complete RTCM frame after 10s, 
+                                          then disconnect from caster */
+uint32_t serverBytesSent = 0;         // Just a running total
+long lastReport_ms = 0;               // Time of last report of bytes sent
+
+
 long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
 // Globals
 SFE_UBLOX_GNSS myGNSS;
 
 void setupGNSS(void);
 void task_rtk_wifi_connection(void *pvParameters);
+
+// Help funcs
+String secondsToTimeFormat(uint32_t sec);
 
 void setup() {
     Wire.begin();
@@ -242,9 +244,19 @@ void setupGNSS() {
 
     if (myGNSS.getSurveyInActive() == true) // Use the helper function
     {
-      DEBUG_SERIAL.println(F("Survey already in progress."));
-      // lcd.setCursor(0, 2);
-      // lcd.print(F("Survey already going"));
+      const String status = "Survey already going";
+      DEBUG_SERIAL.println(status);
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.print(deviceName);
+      display.setCursor(0, 10);
+      display.print(status);
+      display.setCursor(0, 20);
+      display.print("Acc. target: < ");
+      display.print(DESIRED_ACCURACY_M);
+      display.print(" m");
+      
+      display.display();
     }
     else
     {
@@ -253,9 +265,16 @@ void setupGNSS() {
       response = myGNSS.enableSurveyMode(60, DESIRED_ACCURACY_M); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
       if (response == false)
       {
-        DEBUG_SERIAL.println(F("Survey start failed"));
-        // lcd.setCursor(0, 3);
-        // lcd.print(F("Survey start failed. Freezing."));
+        const String status = "Survey start failed";
+        DEBUG_SERIAL.println(status);
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        display.print(deviceName);
+        display.setCursor(0, 10);
+        display.print(status);
+        display.setCursor(0, 20);
+        display.print(F("Freezing..."));
+        display.display();
         while (1)
           ;
       }
@@ -286,19 +305,22 @@ void setupGNSS() {
       response &= myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000ms timeout (req can take a long time)
       if (response == true)
       {
+        uint32_t timeElapsed = myGNSS.getSurveyInObservationTime();
+        float meanAccuracy = myGNSS.getSurveyInMeanAccuracy();
+
         DEBUG_SERIAL.print(F("Time elapsed: "));
         DEBUG_SERIAL.print((String)myGNSS.getSurveyInObservationTime()); // Call the helper function
-
-        // lcd.setCursor(0, 1);
-        // lcd.print(F("Elapsed: "));
-        // lcd.print((String)myGNSS.getSurveyInObservationTime()); // Call the helper function
-
         DEBUG_SERIAL.print(F(" Accuracy: "));
-        DEBUG_SERIAL.println((String)myGNSS.getSurveyInMeanAccuracy()); // Call the helper function
+        DEBUG_SERIAL.println(meanAccuracy); // Call the helper function
 
-        // lcd.setCursor(0, 2);
-        // lcd.print(F("Accuracy: "));
-        // lcd.print((String)myGNSS.getSurveyInMeanAccuracy()); // Call the helper function
+        display.setCursor(0, 30);
+        display.print(F("Elapsed: "));
+        display.print(secondsToTimeFormat(timeElapsed)); // Call the helper function
+        display.setCursor(0, 40);
+        display.print(F("Accuracy: "));
+        display.print(String(meanAccuracy)); // Call the helper function
+        display.print(F(" m"));
+        display.display();
       }
       else {
         DEBUG_SERIAL.println(F("SVIN request failed"));
@@ -348,8 +370,10 @@ void setupWiFi(const String& ssid, const String& key) {
     DEBUG_SERIAL.println();
     DEBUG_SERIAL.print(F("Connecting to "));
     DEBUG_SERIAL.println(ssid);
+    WiFi.setHostname(deviceName.c_str());
     WiFi.mode(WIFI_STA);
     WiFi.softAPdisconnect(true);
+    // WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
     WiFi.begin(ssid.c_str(), key.c_str());
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
@@ -440,8 +464,13 @@ void task_rtk_wifi_connection(void *pvParameters) {
             //RTK2Go will ban your IP address if you abuse it. See http://www.rtk2go.com/how-to-get-your-ip-banned/
             //So let's not leave the socket open/hanging without data
             if (millis() - lastSentRTCM_ms > maxTimeBeforeHangup_ms) {
-                DEBUG_SERIAL.println(F("RTCM timeout. Disconnecting..."));
+                const String status = "RTCM timeout. Disconnecting...";
+                DEBUG_SERIAL.println(status);
                 ntripCaster.stop();
+                display.clearDisplay();
+                display.setCursor(0,0);
+                display.print(status);
+                display.display();
                 // return;
         }
 
@@ -451,6 +480,10 @@ void task_rtk_wifi_connection(void *pvParameters) {
         if (millis() - lastReport_ms > 250) {
             lastReport_ms += 250;
             DEBUG_SERIAL.printf("Total sent: %d\n", serverBytesSent);
+            display.setCursor(0,50);
+            display.print(F("Total sent: "));
+            display.print(String(serverBytesSent));
+            display.display();
             }
         }
 
@@ -500,4 +533,17 @@ void setup_display() {
   //display.drawLine(0, 0, display.width() - 1, 0, SH110X_WHITE);
   display.setTextColor(SH110X_WHITE, SH110X_BLACK);
   DEBUG_SERIAL.println(F("Display setup done"));
+}
+
+
+String secondsToTimeFormat(uint32_t sec) {  //Time we are converting. This can be passed from another function.
+  int hh = sec/3600;             //Number of seconds in an hour
+  int mm = (sec-hh*3600)/60;     //Remove the number of hours and calculate the minutes.
+  int ss = sec-hh*3600-mm*60;    //Remove the number of hours and minutes, leaving only seconds.
+  String hhStr = hh < 10 ? ("0" + String(hh)) : String(hh);
+  String mmStr = mm < 10 ? ("0" + String(mm)) : String(mm);
+  String ssStr = ss < 10 ? ("0" + String(ss)) : String(ss);                          
+  String hhMmmSs = (hhStr + ":" + mmStr + ":" + ssStr);
+
+  return hhMmmSs;
 }

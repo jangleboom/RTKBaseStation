@@ -73,7 +73,7 @@ bool loadWiFiCredsForm() {
   String p = EEPROM.readString(KEY_ADDR);
   
   Serial.println(F("Setting Access Point..."));
-  String ssidAP = getDeviceName(DEVICE_TYPE);
+  const String ssidAP = getDeviceName(DEVICE_TYPE_PREFIX);
   DEBUG_SERIAL.print("ssidAP: ");
   DEBUG_SERIAL.println(ssidAP);
   WiFi.softAP(ssidAP.c_str(), DEFAULT_KEY);

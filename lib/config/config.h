@@ -25,7 +25,7 @@
 /*******************************************************************************
  *                         Default WiFi settings
  * ****************************************************************************/
-#define DEVICE_TYPE                  "RTKBase_"
+#define DEVICE_TYPE_PREFIX           "RTKBase_"
 #define DEFAULT_KEY                  "12345678"
 String getDeviceName(const String &);
 uint32_t getChipId(void);
@@ -38,6 +38,10 @@ uint32_t getChipId(void);
 // #define RTK_SCL_PIN                 32
 #define I2C_FREQUENCY_100K            100000  // 100 kHz
 #define I2C_FREQUENCY_400K            400000  // 400 kHz
+
+/*******************************************************************************
+ *                         Oled
+ * ****************************************************************************/
 
 /*******************************************************************************
  *                         FreeRTOS
