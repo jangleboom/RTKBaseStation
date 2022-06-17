@@ -118,18 +118,12 @@ void setup() {
     #endif
     DEBUG_SERIAL.print(F("Device name: "));
     DEBUG_SERIAL.println(deviceName);
-   
-    setup_display();
-    display.setCursor(0,10);
-    String greeting = "Hello " + deviceName;
-    display.print(greeting.c_str());
-    display.display();
 
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
 
-
+    setup_display();
 
     //wipeEEPROM();
     // TODO: make the WiFi setup a primary task
@@ -144,6 +138,8 @@ void setup() {
     String key = EEPROM.readString(KEY_ADDR);
     setupWiFi(ssid, key);
     };
+
+  
 
     xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
     
@@ -533,6 +529,11 @@ void setup_display() {
   //display.drawLine(0, 0, display.width() - 1, 0, SH110X_WHITE);
   display.setTextColor(SH110X_WHITE, SH110X_BLACK);
   DEBUG_SERIAL.println(F("Display setup done"));
+  display.setCursor(0,0);
+  display.print(F("Hello from station"));
+  display.setCursor(0,10);
+  display.print(deviceName.c_str());
+  display.display();
 }
 
 
