@@ -122,12 +122,10 @@ void setup() {
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
-
-    setup_display();
-
-    //wipeEEPROM();
+   
     // TODO: make the WiFi setup a primary task
     EEPROM.begin(400);
+    // wipeEEPROM();
     if (!checkWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);
         DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));
@@ -139,11 +137,11 @@ void setup() {
     setupWiFi(ssid, key);
     };
 
-  
+    setup_display();
 
     xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
     
-    String thisBoard= ARDUINO_BOARD;
+    String thisBoard = ARDUINO_BOARD;
     DEBUG_SERIAL.print(F("Setup done on "));
     DEBUG_SERIAL.println(thisBoard);
 }
@@ -514,14 +512,13 @@ void buttonHandler(Button2 &btn)
  * ****************************************************************************/
 
 void setup_display() {
-  // if (!display.begin()) {
   if (!display.begin(OLED_I2C_ADDR, true)) {
     DEBUG_SERIAL.println("Could not find SH110X? Check wiring");
     while (true) delay(100);
   } // Address 0x3C default
  
   display.display();
-  delay(1000);
+  delay(500);
 
   // Clear the buffer.
   display.clearDisplay();

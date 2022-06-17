@@ -119,7 +119,7 @@ bool checkWiFiCreds() {
 
 void wipeEEPROM() {
   for(int i=0; i<END_ADDR; i++){
-    EEPROM.writeByte(i,0);
+    EEPROM.writeByte(i,0x00);
   }
   EEPROM.commit();
 }
