@@ -129,8 +129,6 @@ void setup() {
    
     // TODO: make the WiFi setup a primary task
     EEPROM.begin(EEPROM_SIZE);
-
-    setupAP();
     //wipeEEPROM();
 
     if (!checkWiFiCreds()) {
