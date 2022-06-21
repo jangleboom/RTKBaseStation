@@ -2,6 +2,21 @@
 
 WebServer server(80);
 
+String readStringFromEeprom(uint16_t startAddr) {
+  String s = EEPROM.readString(SSID_ADDR);
+  DEBUG_SERIAL.print(F("Found in EEPROM!"));
+  DEBUG_SERIAL.println(s);
+
+  delay(500);
+  if (s.length() > 0) {
+    return s;
+  } else {
+    DEBUG_SERIAL.print(F("No string found on address: "));
+    DEBUG_SERIAL.println(startAddr);
+  }
+  return String();
+}
+
 void handleNotFound() {
   String message = "File Not Found\n\n";
   message += "URI: ";
@@ -18,7 +33,7 @@ void handleNotFound() {
 }
 
 bool writeToMemory(String ssid, String pass) {
-  unsigned int bufLen = 30;
+  unsigned int bufLen = WIFI_CRED_BUF_LEN;
   char ssidBuf[bufLen];
   char passBuf[bufLen];
   ssid.toCharArray(ssidBuf, bufLen);
@@ -59,12 +74,19 @@ void handleSubmit() {
   }
 }
 
+
 void handleRoot() {
-  if (server.hasArg("ssid")&& server.hasArg("password")) {
+  if (server.hasArg("ssid") && server.hasArg("password")) {
     handleSubmit();
   }
   else {
-    server.send(200, "text/html", INDEX_HTML);
+    const String mySSID = "\"SSID: Loewenzahn\"";
+    const String eepromSSID = readStringFromEeprom(SSID_ADDR);
+    const String myHTML = HTML_1 + (eepromSSID.isEmpty() ? "SSID" : eepromSSID) 
+                          + HTML_2 + (readStringFromEeprom(KEY_ADDR).isEmpty() ? "PASSWORD" : "*******")
+                          + HTML_3;
+    // server.send(200, "text/html", INDEX_HTML);
+    server.send(200, "text/html", myHTML);
   }
 }
 

@@ -20,6 +20,8 @@
  *          - make coords input dynamically on server page
  *          - set target accuracy for survey
  *          - add display and buttons
+ *          - replace #defines with typesafe alternatives
+ *          - AP only for WiFi settings, run RTK location setup in local WiFi
  *        
  * @note    How to handle WiFi: 
  *           - Push the button 
@@ -30,7 +32,8 @@
  *              using for you personal access point on your smartphone
  *            - If the process is done, the LED turns off and the device reboots
  *            - If there are no Wifi credentials stored in the EEPROM, the device 
- *              will jump in this mode on startup
+ *              will jump in WIFI_AP mode on startup, if yes it tries to connect in WIFI_STA to the 
+ *              saved SSID
  *            - Hint: If needed do your HTML changes in the index.html file, then copy the content to
  *              https://davidjwatts.com/youtube/esp8266/esp-convertHTM.html#
  *              paste the result into the html.h file
@@ -124,8 +127,8 @@ void setup() {
     digitalWrite(LED_BUILTIN, LOW);
    
     // TODO: make the WiFi setup a primary task
-    EEPROM.begin(400);
-    // wipeEEPROM();
+    EEPROM.begin(EEPROM_SIZE);
+    //wipeEEPROM();
     if (!checkWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);
         DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));

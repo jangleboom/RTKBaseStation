@@ -21,11 +21,6 @@
 #include "EEPROM.h"
 #include "html.h"
 
-
-#define SSID_ADDR 100
-#define KEY_ADDR 200
-#define END_ADDR 400
-
 /**
  * @brief Function to handle unknown URLs
  */

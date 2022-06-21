@@ -1,5 +1,15 @@
 #include "config.h"
 
+struct HighPrecisionLocation {
+  uint32_t magic;                 // Magic keyword, that tells us if we're reading garbage from EEPROM
+  int32_t lat;                    // 7-digits
+  int8_t lat_high_pre_part;       // high precision extension
+  int32_t lon;                    // 7-digits
+  int8_t lon_high_prec_part;      // high precision extension
+  int32_t alt;                    // Unit: mm
+  int8_t alt_high_prec_part;      // high precision extension
+};
+
 uint32_t getChipId() {
   uint32_t chipId = 0;
 
