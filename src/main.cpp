@@ -22,6 +22,7 @@
  *          - add display and buttons
  *          - replace #defines with typesafe alternatives
  *          - AP only for WiFi settings, run RTK location setup in local WiFi
+ *          - show IP and SSID on Display (if AP PW too)
  *        
  * @note    How to handle WiFi: 
  *           - Push the button 
@@ -128,7 +129,10 @@ void setup() {
    
     // TODO: make the WiFi setup a primary task
     EEPROM.begin(EEPROM_SIZE);
+
+    setupAP();
     //wipeEEPROM();
+
     if (!checkWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);
         DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));
@@ -139,7 +143,7 @@ void setup() {
     String key = EEPROM.readString(KEY_ADDR);
     setupWiFi(ssid, key);
     };
-
+  
     setup_display();
 
     xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);

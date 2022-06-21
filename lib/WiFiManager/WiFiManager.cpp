@@ -90,6 +90,23 @@ void handleRoot() {
   }
 }
 
+void setupAP() {
+  DEBUG_SERIAL.println(F("Setting Access Point..."));
+  const String ssidAP = getDeviceName(DEVICE_TYPE_PREFIX);
+  DEBUG_SERIAL.print("ssidAP: ");
+  DEBUG_SERIAL.println(ssidAP);
+  WiFi.softAP(ssidAP.c_str(), DEFAULT_KEY);
+  
+  IPAddress IP = WiFi.softAPIP();
+  
+  DEBUG_SERIAL.print(F("AP IP address: "));
+  DEBUG_SERIAL.println(IP);
+  
+  server.on("/", handleRoot);
+  server.onNotFound(handleNotFound);
+  server.begin();
+}
+
 bool loadWiFiCredsForm() {
   String s = EEPROM.readString(SSID_ADDR);
   String p = EEPROM.readString(KEY_ADDR);

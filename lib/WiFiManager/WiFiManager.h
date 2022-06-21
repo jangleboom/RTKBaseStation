@@ -24,7 +24,7 @@
 /**
  * @brief Function to handle unknown URLs
  */
-void handleNotFound();
+void handleNotFound(void);
 
 /**
  * @brief Function for writing WiFi creds to EEPROM
@@ -35,29 +35,31 @@ bool writeToMemory(String ssid, String pass);
 /**
  * @brief Function for handling form
  */
-void handleSubmit();
+void handleSubmit(void);
 
 /**
  * @brief Function for home page
  */
-void handleRoot();
+void handleRoot(void);
 
 /**
  * @brief Function for loading form
  * @return false if no WiFi creds in EEPROM
  */
-bool loadWiFiCredsForm();
+bool loadWiFiCredsForm(void);
 
 /**
  * @brief Function checking WiFi creds in memory 
  * @return: true if not empty, false if empty
  */
-bool checkWiFiCreds();
+bool checkWiFiCreds(void);
 
 /**
  * @brief Wipes out the stored WIFI credentials from EEPROM
  * 
  */
-void wipeEEPROM();
+void wipeEEPROM(void);
+
+void setupAP(void);
 
 #endif /* WIFI_MANAGER_H */ 
