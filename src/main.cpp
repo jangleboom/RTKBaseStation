@@ -17,11 +17,7 @@
  * @todo    - first check if myGNSS is getting data BEFORE establish the caster connection,
  *            otherwise they will ban our IP for 4 hours minimum
  *          - write func for converting lat/long hight into X/Y/Z coords
- *          - make coords input dynamically on server page
- *          - set target accuracy for survey
  *          - add display and buttons
- *          - replace #defines with typesafe alternatives
- *          - AP only for WiFi settings, run RTK location setup in local WiFi
  *          - show IP and SSID on Display (if AP PW too)
  *        
  * @note    How to handle WiFi: 
@@ -35,9 +31,6 @@
  *            - If there are no Wifi credentials stored in the EEPROM, the device 
  *              will jump in WIFI_AP mode on startup, if yes it tries to connect in WIFI_STA to the 
  *              saved SSID
- *            - Hint: If needed do your HTML changes in the index.html file, then copy the content to
- *              https://davidjwatts.com/youtube/esp8266/esp-convertHTM.html#
- *              paste the result into the html.h file
  * 
  *          How to measure battery: Easiest way, use a fuel gauge breakout board 
  *          e. g. Adafruit_LC709203F, because the Sparkfun ESP32 Thing Plus 
@@ -85,7 +78,7 @@ void buttonHandler(Button2 &btn);
 /*******************************************************************************
  *                                 WiFi
  * ****************************************************************************/
-#include <WiFiManager.h>
+#include <RTKBaseManager.h>
 #include <WiFi.h>
 
 void setupWiFi(const String& ssid, const String& key);
@@ -128,10 +121,6 @@ void setup() {
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
-   
-    // TODO: make the WiFi setup a primary task
-    EEPROM.begin(EEPROM_SIZE);
-    wipeEEPROM();
 
     if (!checkWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);
@@ -139,8 +128,8 @@ void setup() {
         while (loadWiFiCredsForm());
     }  else {
     // Then log into WiFi
-    String ssid = EEPROM.readString(SSID_ADDR);
-    String key = EEPROM.readString(KEY_ADDR);
+    String ssid = readFile(SPIFFS, PATH_WIFI_SSID);
+    String key = readFile(SPIFFS, PATH_WIFI_PASSWORD);
     setupWiFi(ssid, key);
     };
   
