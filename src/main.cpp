@@ -14,7 +14,9 @@
  * <br>
  * @date    2022/05/09
  * 
- * @todo    - first check if myGNSS is getting data BEFORE establish the caster connection,
+ * @todo    - Read SPIFFS settings before setup GNSS
+ *          - Set AP IP
+ *          - first check if myGNSS is getting data BEFORE establish the caster connection,
  *            otherwise they will ban our IP for 4 hours minimum
  *          - write func for converting lat/long hight into X/Y/Z coords
  *          - add display and buttons
@@ -23,7 +25,7 @@
  * @note    How to handle WiFi: 
  *           - Push the button 
  *           - Join the AP thats appearing 
- *               -# SSID: e. g. "RTKBase_" + ChipID 
+ *               -# SSID: e. g. "RTKBase" 
  *               -# PW: e. g. "12345678"
  *            - Open address 192.168.4.1 in your browser and set credentials you are 
  *              using for you personal access point on your smartphone
@@ -45,8 +47,6 @@
 #include <config.h>
 #include <secrets.h> // You need to create your own header file, like discribed in README.md
 
-const String deviceName = getDeviceName(DEVICE_TYPE_PREFIX);
-
 /*******************************************************************************
  *                                 Display
  * ****************************************************************************/
@@ -62,8 +62,10 @@ const String deviceName = getDeviceName(DEVICE_TYPE_PREFIX);
 #define OLED_RESET -1   //   QT-PY / XIAO
 // Global objects
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+bool is_display_connected;
 // Prototypes
-void setup_display(void);
+bool setup_display(void);
+
 
 /*******************************************************************************
  *                                 Button(s)
@@ -81,9 +83,17 @@ void buttonHandler(Button2 &btn);
 #include <RTKBaseManager.h>
 #include <WiFi.h>
 
-void setupWiFi(const String& ssid, const String& key);
+using namespace RTKBaseManager;
+AsyncWebServer server(80);
+
+const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
+String scannedSSIDs[MAX_SSIDS];
+void setupAsWifiAP(const char* ap_ssid, const char* ap_password);
+void setupAsWifiStation(const char* ssid, const char* password, const char* device_name);
+
 // Globals
 WiFiClient ntripCaster;
+
 /*******************************************************************************
  *                                 GNSS
  * ****************************************************************************/
@@ -108,38 +118,54 @@ void task_rtk_wifi_connection(void *pvParameters);
 String secondsToTimeFormat(uint32_t sec);
 
 void setup() {
-    Wire.begin();
-    #ifdef DEBUGGING
-    Serial.begin(BAUD);
-    while (!Serial) {};
-    #endif
-    DEBUG_SERIAL.print(F("Device name: "));
-    DEBUG_SERIAL.println(deviceName);
-    // uint32_t a = 0;
-    // DEBUG_SERIAL.printf("max sizeof uin32_t: %d, %ld", sizeof(a), UINT32_MAX);
-    // while (true) {};
-    button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, LOW);
+  Wire.begin();
+  #ifdef DEBUGGING
+  Serial.begin(BAUD);
+  while (!Serial) {};
+  #endif
+  DEBUG_SERIAL.print(F("Device name: "));
+  DEBUG_SERIAL.println(DEVICE_NAME);
+  // uint32_t a = 0;
+  // DEBUG_SERIAL.printf("max sizeof uin32_t: %d, %ld", sizeof(a), UINT32_MAX);
+  // while (true) {};
+  button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
 
-    if (!checkWiFiCreds()) {
-        digitalWrite(LED_BUILTIN, HIGH);
-        DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));
-        while (loadWiFiCredsForm());
-    }  else {
-    // Then log into WiFi
-    String ssid = readFile(SPIFFS, PATH_WIFI_SSID);
-    String key = readFile(SPIFFS, PATH_WIFI_PASSWORD);
-    setupWiFi(ssid, key);
-    };
+  WiFi.setHostname(DEVICE_NAME);
+
+  // Check if we have credentials for a available network
+  String localNetworkSSID = readFile(SPIFFS, PATH_WIFI_SSID);
+  String localNetworkPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
+
+  if (!knownNetworkAvailable(localNetworkSSID, scannedSSIDs, MAX_SSIDS) || localNetworkPassword.isEmpty()) {
+    int foundAPs = scanWiFiAPs(scannedSSIDs, MAX_SSIDS);
+    for (int i=0; i<foundAPs; i++) {
+      Serial.printf("%d %s\n", i+1, scannedSSIDs[i].c_str());
+    }
+    delay(1000);
+    setupAsWifiAP(SSID_AP, PASSWORD_AP);
+ } else {
+    setupAsWifiStation(localNetworkSSID.c_str(), localNetworkPassword.c_str(), DEVICE_NAME);
+  }
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", INDEX_HTML, processor);
+  });
+
+  server.on("/actionUpdateData", HTTP_POST, actionUpdateData);
+  server.on("/actionWipeData", HTTP_POST, actionWipeData);
+  server.on("/actionRebootESP32", HTTP_POST, actionRebootESP32);
+  server.onNotFound(notFound);
+  server.begin();
   
-    setup_display();
+  setup_display();
 
-    xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-    
-    String thisBoard = ARDUINO_BOARD;
-    DEBUG_SERIAL.print(F("Setup done on "));
-    DEBUG_SERIAL.println(thisBoard);
+  xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  
+  String thisBoard = ARDUINO_BOARD;
+  DEBUG_SERIAL.print(F("Setup done on "));
+  DEBUG_SERIAL.println(thisBoard);
 }
 
 
@@ -151,6 +177,42 @@ void loop() {
     #endif
     #endif
     button.loop();
+}
+
+/*******************************************************************************
+ *                                 WiFi
+ * ****************************************************************************/
+
+void setupAsWifiStation(const char* ssid, const char* password, const char* device_name) {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    // TODO:  - count reboots and stop after 3 times (save in SPIFFS)
+    //        - display state
+    Serial.println("WiFi Failed! Reboot in 10 s as AP!");
+    delay(10000);
+    ESP.restart();
+  }
+  Serial.println();
+
+  if (!MDNS.begin(device_name)) {
+      Serial.println("Error starting mDNS, use local IP instead!");
+  } else {
+    Serial.printf("Starting mDNS, find me under <http://www.%s.local>\n", device_name);
+  }
+
+  Serial.print("Wifi client started: "); Serial.println(WiFi.getHostname());
+  Serial.print("IP Address: "); Serial.println(WiFi.localIP());
+}
+
+void setupAsWifiAP(const char* ap_ssid, const char* ap_password) {
+  Serial.print("Setting soft-AP ... ");
+  WiFi.mode(WIFI_AP);
+  Serial.println(WiFi.softAP(ap_ssid, ap_password) ? "Ready" : "Failed!");
+  Serial.print("Access point started: ");
+  Serial.println(ap_ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.softAPIP());
 }
 
 /*******************************************************************************
@@ -238,7 +300,7 @@ void setupGNSS() {
       DEBUG_SERIAL.println(status);
       display.clearDisplay();
       display.setCursor(0, 0);
-      display.print(deviceName);
+      display.print(DEVICE_NAME);
       display.setCursor(0, 10);
       display.print(status);
       display.setCursor(0, 20);
@@ -257,14 +319,17 @@ void setupGNSS() {
       {
         const String status = "Survey start failed";
         DEBUG_SERIAL.println(status);
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.print(deviceName);
-        display.setCursor(0, 10);
-        display.print(status);
-        display.setCursor(0, 20);
-        display.print(F("Freezing..."));
-        display.display();
+        if (is_display_connected) {
+          display.clearDisplay();
+          display.setCursor(0, 0);
+          display.print(DEVICE_NAME);
+          display.setCursor(0, 10);
+          display.print(status);
+          display.setCursor(0, 20);
+          display.print(F("Freezing..."));
+          display.display();
+        }
+   
         while (1)
           ;
       }
@@ -276,18 +341,6 @@ void setupGNSS() {
     //Begin waiting for survey to complete
     while (myGNSS.getSurveyInValid() == false) // Call the helper function
     {
-      // if (Serial.available())
-      // {
-      //   byte incoming = Serial.read();
-      //   if (incoming == 'x')
-      //   {
-      //     //Stop survey mode
-      //     response = myGNSS.disableSurveyMode(); //Disable survey
-      //     Serial.println(F("Survey stopped"));
-      //     break;
-      //   }
-      // }
-
       // From v2.0, the data from getSurveyStatus (UBX-NAV-SVIN) is returned in UBX_NAV_SVIN_t packetUBXNAVSVIN
       // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
       // You can either read the data from packetUBXNAVSVIN directly
@@ -303,14 +356,17 @@ void setupGNSS() {
         DEBUG_SERIAL.print(F(" Accuracy: "));
         DEBUG_SERIAL.println(meanAccuracy); // Call the helper function
 
-        display.setCursor(0, 30);
-        display.print(F("Elapsed: "));
-        display.print(secondsToTimeFormat(timeElapsed)); // Call the helper function
-        display.setCursor(0, 40);
-        display.print(F("Accuracy: "));
-        display.print(String(meanAccuracy)); // Call the helper function
-        display.print(F(" m"));
-        display.display();
+        if (is_display_connected) {
+          display.setCursor(0, 30);
+          display.print(F("Elapsed: "));
+          display.print(secondsToTimeFormat(timeElapsed)); // Call the helper function
+          display.setCursor(0, 40);
+          display.print(F("Accuracy: "));
+          display.print(String(meanAccuracy)); // Call the helper function
+          display.print(F(" m"));
+          display.display();
+        }
+   
       }
       else {
         DEBUG_SERIAL.println(F("SVIN request failed"));
@@ -328,14 +384,10 @@ void setupGNSS() {
     //  DEBUG_SERIAL.println(F("Module failed to save"));
   }
 
-
-   
 /* 
   ECEF coordinates: Example tiny office Brieslang
   after running look here: http://new.rtk2go.com:2101/SNIP::STATUS
 */
-
-
 
   DEBUG_SERIAL.println(F("Module configuration complete"));
 }
@@ -354,27 +406,6 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
  *                                 WiFi
  * ****************************************************************************/
 
-void setupWiFi(const String& ssid, const String& key) {
-    delay(10);
-    // Connecting to a WiFi network
-    DEBUG_SERIAL.println();
-    DEBUG_SERIAL.print(F("Connecting to "));
-    DEBUG_SERIAL.println(ssid);
-    WiFi.setHostname(deviceName.c_str());
-    WiFi.mode(WIFI_STA);
-    WiFi.softAPdisconnect(true);
-    // WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-    WiFi.begin(ssid.c_str(), key.c_str());
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        DEBUG_SERIAL.print(F("."));
-    }
-    DEBUG_SERIAL.println(F(""));
-    DEBUG_SERIAL.println(F("WiFi connected"));
-    DEBUG_SERIAL.println(F("IP address: "));
-    DEBUG_SERIAL.println(WiFi.localIP());
-}
-
 void task_rtk_wifi_connection(void *pvParameters) {
     (void)pvParameters;
     Wire.setClock(I2C_FREQUENCY_100K);
@@ -389,7 +420,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
     char response[512];
     int responseSpot = 0;
     
-    while (1) {
+    while (true) {
       // beginServing() func content
       // Connect if we are not already
       if (ntripCaster.connected() == false) {
@@ -457,10 +488,13 @@ void task_rtk_wifi_connection(void *pvParameters) {
                 const String status = "RTCM timeout. Disconnecting...";
                 DEBUG_SERIAL.println(status);
                 ntripCaster.stop();
-                display.clearDisplay();
-                display.setCursor(0,0);
-                display.print(status);
-                display.display();
+
+                if (is_display_connected) {
+                  display.clearDisplay();
+                  display.setCursor(0,0);
+                  display.print(status);
+                  display.display();
+                }
                 // return;
         }
 
@@ -470,11 +504,15 @@ void task_rtk_wifi_connection(void *pvParameters) {
         if (millis() - lastReport_ms > 250) {
             lastReport_ms += 250;
             DEBUG_SERIAL.printf("Total sent: %d\n", serverBytesSent);
-            display.setCursor(0,50);
-            display.print(F("Total sent: "));
-            display.print(String(serverBytesSent));
-            display.display();
+
+            if (is_display_connected) {
+              display.setCursor(0,50);
+              display.print(F("Total sent: "));
+              display.print(String(serverBytesSent));
+              display.display();
             }
+ 
+          }
         }
 
         // Measure stack size (last was 17772)
@@ -493,13 +531,12 @@ void task_rtk_wifi_connection(void *pvParameters) {
  *                              Button(s)
  * ****************************************************************************/
 
-void buttonHandler(Button2 &btn) 
-{
+void buttonHandler(Button2 &btn) {
   if (btn == button) {
     digitalWrite(LED_BUILTIN, HIGH);
-    DEBUG_SERIAL.println(F("Wiping WiFi credentials from memory..."));
-    wipeEEPROM();
-    while (loadWiFiCredsForm()) {};
+    DEBUG_SERIAL.println(F("Wiping WiFi credentials and RTK settings from memory..."));
+    wipeSpiffsFiles();
+    ESP.restart();
   }
 }
 
@@ -507,26 +544,33 @@ void buttonHandler(Button2 &btn)
  *                                Display
  * ****************************************************************************/
 
-void setup_display() {
+bool setup_display() {
+  is_display_connected = false;
   if (!display.begin(OLED_I2C_ADDR, true)) {
     DEBUG_SERIAL.println("Could not find SH110X? Check wiring");
-    while (true) delay(100);
-  } // Address 0x3C default
+    // while (true) delay(100);
+  } else { // Address 0x3C default
+    is_display_connected = true;
+  }
  
-  display.display();
-  delay(500);
+  if (is_display_connected) {
+    display.display();
+    delay(500);
 
-  // Clear the buffer.
-  display.clearDisplay();
-  display.setTextSize(1);
-  //display.drawLine(0, 0, display.width() - 1, 0, SH110X_WHITE);
-  display.setTextColor(SH110X_WHITE, SH110X_BLACK);
-  DEBUG_SERIAL.println(F("Display setup done"));
-  display.setCursor(0,0);
-  display.print(F("Hello from station"));
-  display.setCursor(0,10);
-  display.print(deviceName.c_str());
-  display.display();
+    // Clear the buffer.
+    display.clearDisplay();
+    display.setTextSize(1);
+    //display.drawLine(0, 0, display.width() - 1, 0, SH110X_WHITE);
+    display.setTextColor(SH110X_WHITE, SH110X_BLACK);
+    DEBUG_SERIAL.println(F("Display setup done"));
+    display.setCursor(0,0);
+    display.print(F("Hello from station"));
+    display.setCursor(0,10);
+    display.print(DEVICE_NAME);
+    display.display();
+  }
+
+  return is_display_connected;
 }
 
 
@@ -541,3 +585,4 @@ String secondsToTimeFormat(uint32_t sec) {  //Time we are converting. This can b
 
   return hhMmmSs;
 }
+
