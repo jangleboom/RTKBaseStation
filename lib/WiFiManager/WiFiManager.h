@@ -60,6 +60,27 @@ bool checkWiFiCreds(void);
  */
 void wipeEEPROM(void);
 
+/**
+ * @brief Set up AP to config WiFi and RTCM 
+ * 
+ */
 void setupAP(void);
+
+/**
+ * @brief Read a string stored in EEPROM
+ * 
+ * @param addr Address in EEPROM memory
+ * @return String stored on this address, empty if nothing was found
+ */
+String readStringFromEeprom(uint16_t addr);
+
+/**
+ * @brief Write a bool value to EEPROM
+ * 
+ * @param addr Address in EEPROM memory
+ * @param val Value to be stored on this address
+ * @return true if saving was success, false if not
+ */
+bool writeBitFromEeprom(uint16_t addr, bool val);
 
 #endif /* WIFI_MANAGER_H */ 

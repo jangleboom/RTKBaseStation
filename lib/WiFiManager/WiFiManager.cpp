@@ -1,9 +1,23 @@
 #include "WiFiManager.h"
 
 WebServer server(80);
+bool readBitFromEeprom(uint16_t addr) {
+  bool val = EEPROM.readBool(addr);
+  return val;
+}
 
-String readStringFromEeprom(uint16_t startAddr) {
-  String s = EEPROM.readString(SSID_ADDR);
+bool writeBitFromEeprom(uint16_t addr, bool val) {
+  EEPROM.writeBool(addr, val);
+  if (readBitFromEeprom(addr) == val) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+
+String readStringFromEeprom(uint16_t addr) {
+  String s = EEPROM.readString(addr);
   DEBUG_SERIAL.print(F("Found in EEPROM!"));
   DEBUG_SERIAL.println(s);
 
@@ -12,7 +26,7 @@ String readStringFromEeprom(uint16_t startAddr) {
     return s;
   } else {
     DEBUG_SERIAL.print(F("No string found on address: "));
-    DEBUG_SERIAL.println(startAddr);
+    DEBUG_SERIAL.println(addr);
   }
   return String();
 }

@@ -122,14 +122,16 @@ void setup() {
     #endif
     DEBUG_SERIAL.print(F("Device name: "));
     DEBUG_SERIAL.println(deviceName);
-
+    // uint32_t a = 0;
+    // DEBUG_SERIAL.printf("max sizeof uin32_t: %d, %ld", sizeof(a), UINT32_MAX);
+    // while (true) {};
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
    
     // TODO: make the WiFi setup a primary task
     EEPROM.begin(EEPROM_SIZE);
-    //wipeEEPROM();
+    wipeEEPROM();
 
     if (!checkWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);

@@ -40,18 +40,7 @@ const uint16_t END_ADDR             = 400;
  * ****************************************************************************/
 #define DEVICE_TYPE_PREFIX           "RTKBase_"
 #define DEFAULT_KEY                  "12345678"
-/**
- * @brief Get the Device Name object
- * 
- * @return String Device Name
- */
 String getDeviceName(const String &);
-
-/**
- * @brief Get the Chip Id object
- * 
- * @return uint32_t Chip Id
- */
 uint32_t getChipId(void);
 
 /*******************************************************************************
