@@ -23,23 +23,13 @@
 #endif
 
 /*******************************************************************************
- *                         EEPROM 
+ *                         SPIFFS 
  * ****************************************************************************/
-const uint16_t EEPROM_SIZE          = 400;
-const uint8_t  WIFI_CRED_BUF_LEN    = 29;   // Max lenght of WiFi SSID or PW
-const uint16_t SSID_ADDR            = 100;  // Size = WIFI_CRED_BUF_LEN
-const uint16_t KEY_ADDR             = 130;  // Size = WIFI_CRED_BUF_LEN
-const uint16_t WIFI_CRED_END_ADDR   = 160;
-const uint16_t LOCATION_ADDR        = 170;  // Size = 12 (3 x uint32_t)
-const uint16_t LOCATION_END_ADDR    = 175;
-const uint16_t SURVEY_ENABLED_ADDR  = 180;  // Size = 4
-const uint16_t SURVEY_ACCURACY_ADDR = 185;  // Size = 4
-const uint16_t END_ADDR             = 400;
+
 /*******************************************************************************
  *                         WiFi settings
  * ****************************************************************************/
-// #define DEVICE_TYPE_PREFIX           "RTKBase_"
-// #define DEFAULT_KEY                  "12345678"
+const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 // /**
 //  * @brief Get the Device Name object
 //  * 

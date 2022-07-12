@@ -87,7 +87,7 @@ void buttonHandler(Button2 &btn);
 using namespace RTKBaseManager;
 AsyncWebServer server(80);
 
-const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
+
 String scannedSSIDs[MAX_SSIDS];
 void setupAsWifiAP(const char* ap_ssid, const char* ap_password);
 void setupAsWifiStation(const char* ssid, const char* password, const char* device_name);
@@ -99,7 +99,26 @@ WiFiClient ntripCaster;
  *                                 GNSS
  * ****************************************************************************/
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
+typedef struct {
+  double latitude;
+  double longitude;
+  double altitude;
+} BaseLocationDoubleFormat;
 
+typedef struct {
+  int32_t latitude;       // 7 post comma digits latitude
+  int8_t  latitude_hp;    // high precision extension latitude
+  int32_t longitude;      // 7 post comma digits longitude
+  int8_t  longitude_hp;   // high precision extension longitude
+  int32_t altitude;       // 7 post comma digits height
+  int8_t  altitude_hp;    // high precision extension height
+} BaseLocationIntegerFormat;
+
+void convertDoubleToTwoInt(double input, int32_t out1, uint8_t out2) {
+  
+}
+
+BaseLocationIntegerFormat defaultLocation = {};
 // ? Avoid Global Variables
 long lastSentRTCM_ms = 0;             // Time of last data pushed to socket
 int maxTimeBeforeHangup_ms = 10000;   /* If we fail to get a complete RTCM frame after 10s, 
@@ -107,16 +126,18 @@ int maxTimeBeforeHangup_ms = 10000;   /* If we fail to get a complete RTCM frame
 uint32_t serverBytesSent = 0;         // Just a running total
 long lastReport_ms = 0;               // Time of last report of bytes sent
 
-
 long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
 // Globals
 SFE_UBLOX_GNSS myGNSS;
 
-void setupGNSS(void);
+void setupRTKBase(void);
+float getDesiredSurveyAccuracy(void);
+void runSurvey(float desiredAccuracyInM, bool resp);
 void task_rtk_wifi_connection(void *pvParameters);
 
 // Help funcs
 String secondsToTimeFormat(uint32_t sec);
+
 
 void setup() {
   Wire.begin();
@@ -126,6 +147,8 @@ void setup() {
   #endif
   DEBUG_SERIAL.print(F("Device name: "));
   DEBUG_SERIAL.println(DEVICE_NAME);
+  // Initialize SPIFFS
+  setupSPIFFS();
   // uint32_t a = 0;
   // DEBUG_SERIAL.printf("max sizeof uin32_t: %d, %ld", sizeof(a), UINT32_MAX);
   // while (true) {};
@@ -135,8 +158,8 @@ void setup() {
 
   WiFi.setHostname(DEVICE_NAME);
   // Check if we have credentials for a available network
-  String localNetworkSSID = readFile(SPIFFS, PATH_WIFI_SSID);
-  String localNetworkPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
+  String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
+  String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
 
   if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
     setupAPMode(AP_SSID, AP_PASSWORD);
@@ -204,69 +227,28 @@ void setupAsWifiAP(const char* ap_ssid, const char* ap_password) {
 }
 
 /*******************************************************************************
- *                                 GNSS
+ *                                 RTK/GNSS
  * ****************************************************************************/
 
-void setupGNSS() {
-  if (myGNSS.begin(Wire) == false) {
-    DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
-    while (1) {
-        delay(1000);
-        }
+// bool isLocationSaved(const char* longitudePath, const char* latitudePath, const char* heightPath) {
+
+// }
+
+// TODO: check entries of location and convert them into the long/int-format
+// TODO: save location after survey is finished
+// TODO: check input format of coordinates on html
+
+
+float getDesiredSurveyAccuracy() {
+  String savedAccuray = readFile(SPIFFS, PATH_RTK_LOCATION_SURVEY_ACCURACY);
+  if (savedAccuray.isEmpty()) {
+    return DESIRED_ACCURACY_M;
+  } else {
+    return savedAccuray.toFloat();
   }
-    
-  myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_RTCM3 | COM_TYPE_NMEA);  //UBX+RTCM3 is not a valid option so we enable all three.
-  // myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save the communications port settings to flash and BBR
-  myGNSS.setNavigationFrequency(1);  //Set output in Hz. RTCM rarely benefits from >1Hz.
+}
 
-  //Disable all NMEA sentences
-  bool response = true;
-  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GGA, COM_PORT_I2C);
-  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GSA, COM_PORT_I2C);
-  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GSV, COM_PORT_I2C);
-  response &= myGNSS.disableNMEAMessage(UBX_NMEA_RMC, COM_PORT_I2C);
-  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GST, COM_PORT_I2C);
-  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GLL, COM_PORT_I2C);
-  response &= myGNSS.disableNMEAMessage(UBX_NMEA_VTG, COM_PORT_I2C);
-
-  if (response == false) {
-    DEBUG_SERIAL.println(F("Failed to disable NMEA. Freezing..."));
-    while (1)
-      ;
-  } else
-    DEBUG_SERIAL.println(F("NMEA disabled"));
-
-  //Enable necessary RTCM sentences
-  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1005, COM_PORT_I2C, 1);  //Enable message 1005 to output through UART2, message every second
-  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1074, COM_PORT_I2C, 1);
-  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1084, COM_PORT_I2C, 1);
-  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1094, COM_PORT_I2C, 1);
-  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1124, COM_PORT_I2C, 1);
-  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1230, COM_PORT_I2C, 10);  //Enable message every 10 seconds
-
-  if (response == false) {
-    DEBUG_SERIAL.println(F("Failed to enable RTCM. Freezing..."));
-    while (1)
-      ;
-  } else
-    DEBUG_SERIAL.println(F("RTCM sentences enabled"));
-
-  if (STATIC_POSITION == true) {
-    // TODO: write a func to generate that input!
-    // Latitude, Longitude, Altitude input:
-    response &= myGNSS.setStaticPosition(LATITUDE, LATITUDE_HP, LONGITUDE, LONGITUDE_HP, ALTITUDE, ALTITUDE_HP, true); 
-    // Earth-centered corrdinates:
-    //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
-    if (response == false) {
-      DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
-      while (1)
-        ;
-    } else {
-      DEBUG_SERIAL.println(F("Static position set"));
-    }
-
-  } else 
-  {
+void runSurvey(float desiredAccuracyInM, bool resp) {
     //Alternatively to setting a static position, you could do a survey-in
     //but it takes much longer to start generating RTCM data. See Example4_BaseWithLCD
     // Check if Survey is in Progress before initiating one
@@ -274,6 +256,7 @@ void setupGNSS() {
     // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
     // You can either read the data from packetUBXNAVSVIN directly
     // or can use the helper functions: getSurveyInActive; getSurveyInValid; getSurveyInObservationTime; and getSurveyInMeanAccuracy
+    bool response = resp;
     response &= myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000ms timeout (request can take a long time)
     if (response == false)
     {
@@ -367,11 +350,77 @@ void setupGNSS() {
 
     DEBUG_SERIAL.println(F("Base survey complete! RTCM now broadcasting."));
 
-    //If you were setting up a full GNSS station, you would want to save these settings.
-    //Because setting an incorrect static position will disable the ability to get a lock, we will skip saving during this example
-    //if (myGNSS.saveConfiguration() == false) //Save the current settings to flash and BBR
-    //  DEBUG_SERIAL.println(F("Module failed to save"));
+    // If you were setting up a full GNSS station, you would want to save these settings.
+    // Because setting an incorrect static position will disable the ability to get a lock, we will skip saving during this example
+    // if (myGNSS.saveConfiguration() == false) //Save the current settings to flash and BBR
+    // 
+}
+
+void setupRTKBase() {
+  if (myGNSS.begin(Wire) == false) {
+    DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
+    while (1) {
+        delay(1000);
+        }
   }
+    
+  myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_RTCM3 | COM_TYPE_NMEA);  //UBX+RTCM3 is not a valid option so we enable all three.
+  // myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save the communications port settings to flash and BBR
+  myGNSS.setNavigationFrequency(1);  //Set output in Hz. RTCM rarely benefits from >1Hz.
+
+  //Disable all NMEA sentences
+  bool response = true;
+  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GGA, COM_PORT_I2C);
+  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GSA, COM_PORT_I2C);
+  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GSV, COM_PORT_I2C);
+  response &= myGNSS.disableNMEAMessage(UBX_NMEA_RMC, COM_PORT_I2C);
+  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GST, COM_PORT_I2C);
+  response &= myGNSS.disableNMEAMessage(UBX_NMEA_GLL, COM_PORT_I2C);
+  response &= myGNSS.disableNMEAMessage(UBX_NMEA_VTG, COM_PORT_I2C);
+
+  if (response == false) {
+    DEBUG_SERIAL.println(F("Failed to disable NMEA. Freezing..."));
+    while (1)
+      ;
+  } else
+    DEBUG_SERIAL.println(F("NMEA disabled"));
+
+  //Enable necessary RTCM sentences
+  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1005, COM_PORT_I2C, 1);  //Enable message 1005 to output through UART2, message every second
+  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1074, COM_PORT_I2C, 1);
+  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1084, COM_PORT_I2C, 1);
+  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1094, COM_PORT_I2C, 1);
+  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1124, COM_PORT_I2C, 1);
+  response &= myGNSS.enableRTCMmessage(UBX_RTCM_1230, COM_PORT_I2C, 10);  //Enable message every 10 seconds
+
+  if (response == false) {
+    DEBUG_SERIAL.println(F("Failed to enable RTCM. Freezing..."));
+    while (1)
+      ;
+  } else
+    DEBUG_SERIAL.println(F("RTCM sentences enabled"));
+
+  if (STATIC_POSITION == true) {
+    // TODO: write a func to generate that input!
+    // Latitude, Longitude, Altitude input:
+    response &= myGNSS.setStaticPosition(LATITUDE, LATITUDE_HP, LONGITUDE, LONGITUDE_HP, ALTITUDE, ALTITUDE_HP, true); 
+    response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
+    // Earth-centered corrdinates:
+    //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
+    if (response == false) {
+      DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
+      while (1)
+        ;
+    } else {
+      DEBUG_SERIAL.println(F("Static position set"));
+    }
+
+  } else {
+    runSurvey(getDesiredSurveyAccuracy(), response);
+  }
+  
+  DEBUG_SERIAL.println(F("Module failed to save"));
+  
 
 /* 
   ECEF coordinates: Example tiny office Brieslang
@@ -391,6 +440,7 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
     lastSentRTCM_ms = millis();
   }
 }
+
 /*******************************************************************************
  *                                 WiFi
  * ****************************************************************************/
@@ -398,7 +448,7 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
 void task_rtk_wifi_connection(void *pvParameters) {
     (void)pvParameters;
     Wire.setClock(I2C_FREQUENCY_100K);
-    setupGNSS();
+    setupRTKBase();
     // Measure stack size
     // UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
