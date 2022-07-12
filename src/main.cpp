@@ -80,8 +80,9 @@ void buttonHandler(Button2 &btn);
 /*******************************************************************************
  *                                 WiFi
  * ****************************************************************************/
+#include <SPIFFS.h>
 #include <RTKBaseManager.h>
-// #include <WiFi.h>
+#include <WiFi.h>
 
 using namespace RTKBaseManager;
 AsyncWebServer server(80);
@@ -133,31 +134,18 @@ void setup() {
   digitalWrite(LED_BUILTIN, LOW);
 
   WiFi.setHostname(DEVICE_NAME);
-
   // Check if we have credentials for a available network
   String localNetworkSSID = readFile(SPIFFS, PATH_WIFI_SSID);
   String localNetworkPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
 
-  if (!knownNetworkAvailable(localNetworkSSID, scannedSSIDs, MAX_SSIDS) || localNetworkPassword.isEmpty()) {
-    int foundAPs = scanWiFiAPs(scannedSSIDs, MAX_SSIDS);
-    for (int i=0; i<foundAPs; i++) {
-      Serial.printf("%d %s\n", i+1, scannedSSIDs[i].c_str());
-    }
-    delay(1000);
-    setupAsWifiAP(SSID_AP, PASSWORD_AP);
- } else {
-    setupAsWifiStation(localNetworkSSID.c_str(), localNetworkPassword.c_str(), DEVICE_NAME);
-  }
-
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", INDEX_HTML, processor);
-  });
-
-  server.on("/actionUpdateData", HTTP_POST, actionUpdateData);
-  server.on("/actionWipeData", HTTP_POST, actionWipeData);
-  server.on("/actionRebootESP32", HTTP_POST, actionRebootESP32);
-  server.onNotFound(notFound);
-  server.begin();
+  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
+    setupAPMode(AP_SSID, AP_PASSWORD);
+    delay(500);
+  } else {
+   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
+   delay(500);
+ }
+  startServer(&server);
   
   setup_display();
 
