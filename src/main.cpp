@@ -81,7 +81,7 @@ void buttonHandler(Button2 &btn);
  *                                 WiFi
  * ****************************************************************************/
 #include <RTKBaseManager.h>
-#include <WiFi.h>
+// #include <WiFi.h>
 
 using namespace RTKBaseManager;
 AsyncWebServer server(80);
@@ -161,7 +161,7 @@ void setup() {
   
   setup_display();
 
-  xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  // xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   
   String thisBoard = ARDUINO_BOARD;
   DEBUG_SERIAL.print(F("Setup done on "));
@@ -298,17 +298,18 @@ void setupGNSS() {
     {
       const String status = "Survey already going";
       DEBUG_SERIAL.println(status);
-      display.clearDisplay();
-      display.setCursor(0, 0);
-      display.print(DEVICE_NAME);
-      display.setCursor(0, 10);
-      display.print(status);
-      display.setCursor(0, 20);
-      display.print("Acc. target: < ");
-      display.print(DESIRED_ACCURACY_M);
-      display.print(" m");
-      
-      display.display();
+      if (is_display_connected) {
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        display.print(DEVICE_NAME);
+        display.setCursor(0, 10);
+        display.print(status);
+        display.setCursor(0, 20);
+        display.print("Acc. target: < ");
+        display.print(DESIRED_ACCURACY_M);
+        display.print(" m");
+        display.display();
+      }
     }
     else
     {
