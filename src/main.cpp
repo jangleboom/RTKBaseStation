@@ -182,10 +182,8 @@ void setup() {
 
 void loop() {
     #ifdef DEBUGGING
-    #ifdef TESTING
-    DEBUG_SERIAL.println(F("Running Tests..."))
-    aunit::TestRunner::run();
-    #endif
+    // DEBUG_SERIAL.println(F("Running Tests..."))
+    // aunit::TestRunner::run();
     #endif
     button.loop();
 }

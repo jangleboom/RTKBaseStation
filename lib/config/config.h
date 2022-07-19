@@ -16,11 +16,7 @@
 
 #define BAUD                          115200
 // #define TESTING
-#ifdef DEBUGGING
-#ifdef TESTING
-#include "tests.h"
-#endif
-#endif
+
 
 /*******************************************************************************
  *                         SPIFFS 
@@ -54,7 +50,6 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 #define I2C_FREQUENCY_100K            100000  // 100 kHz
 #define I2C_FREQUENCY_400K            400000  // 400 kHz
 // // ! see secrets.h for default location data
-struct HighPrecicionLocation;  
 
 /*******************************************************************************
  *                         Oled
