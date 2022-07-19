@@ -1,9 +1,0 @@
-[submodule "lib/ESPAsyncWebServer"]
-	path = lib/ESPAsyncWebServer
-	url = https://github.com/me-no-dev/ESPAsyncWebServer.git
-	branch = main
-
-[submodule "RTKBaseManager"]
-	path = lib/RTKBaseManager
-	url = https://github.com/audio-communication-group/RTKBaseManager.git
-	branch = library
