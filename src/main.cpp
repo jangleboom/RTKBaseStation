@@ -99,20 +99,6 @@ WiFiClient ntripCaster;
  *                                 GNSS
  * ****************************************************************************/
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
-typedef struct {
-  double latitude;
-  double longitude;
-  double altitude;
-} location_double_t;
-
-typedef struct {
-  int32_t latitude;       // 7 post comma digits latitude
-  int8_t  latitude_hp;    // high precision extension latitude
-  int32_t longitude;      // 7 post comma digits longitude
-  int8_t  longitude_hp;   // high precision extension longitude
-  int32_t altitude;       // 7 post comma digits height
-  int8_t  altitude_hp;    // high precision extension height
-} location_int_t;
 
 // ? Avoid Global Variables
 long lastSentRTCM_ms = 0;             // Time of last data pushed to socket
@@ -140,13 +126,23 @@ void setup() {
   Serial.begin(BAUD);
   while (!Serial) {};
   #endif
+  
+  // Initialize SPIFFS, set true for formatting
+  bool format = false;
+  if (!RTKBaseManager::setupSPIFFS(format)) {
+    DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing"));
+    while (true) {};
+  }
+
+  location_int_t lastLocation;
+  if (getIntLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE)) {
+    printIntLocation(&lastLocation);
+  }
+  
+
   DEBUG_SERIAL.print(F("Device name: "));
   DEBUG_SERIAL.println(DEVICE_NAME);
-  // Initialize SPIFFS
-  setupSPIFFS();
-  // uint32_t a = 0;
-  // DEBUG_SERIAL.printf("max sizeof uin32_t: %d, %ld", sizeof(a), UINT32_MAX);
-  // while (true) {};
+
   button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
