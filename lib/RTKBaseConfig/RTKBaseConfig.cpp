@@ -1,6 +1,4 @@
-#include "config.h"
-
-
+#include "RTKBaseConfig.h"
 
 uint32_t getChipId() {
   uint32_t chipId = 0;

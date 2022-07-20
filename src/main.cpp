@@ -44,8 +44,8 @@
 
 #include <Arduino.h>
 #include <Wire.h> // Display and uBlox GNSS
-#include <config.h>
-#include <secrets.h> // You need to create your own header file, like discribed in README.md
+#include <RTKBaseConfig.h>
+#include <RTKSecrets.h> // You need to create your own header file, like discribed in README.md
 
 /*******************************************************************************
  *                                 Display
@@ -103,7 +103,7 @@ typedef struct {
   double latitude;
   double longitude;
   double altitude;
-} BaseLocationDoubleFormat;
+} location_double_t;
 
 typedef struct {
   int32_t latitude;       // 7 post comma digits latitude
@@ -112,13 +112,8 @@ typedef struct {
   int8_t  longitude_hp;   // high precision extension longitude
   int32_t altitude;       // 7 post comma digits height
   int8_t  altitude_hp;    // high precision extension height
-} BaseLocationIntegerFormat;
+} location_int_t;
 
-void convertDoubleToTwoInt(double input, int32_t out1, uint8_t out2) {
-  
-}
-
-BaseLocationIntegerFormat defaultLocation = {};
 // ? Avoid Global Variables
 long lastSentRTCM_ms = 0;             // Time of last data pushed to socket
 int maxTimeBeforeHangup_ms = 10000;   /* If we fail to get a complete RTCM frame after 10s, 
@@ -181,10 +176,10 @@ void setup() {
 
 
 void loop() {
-    #ifdef DEBUGGING
-    // DEBUG_SERIAL.println(F("Running Tests..."))
+    // #ifdef DEBUGGING
+    // DEBUG_SERIAL.println(F("Running Tests..."));
     // aunit::TestRunner::run();
-    #endif
+    // #endif
     button.loop();
 }
 
