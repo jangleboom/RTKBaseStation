@@ -67,7 +67,7 @@
 #define OLED_RESET -1   //   QT-PY / XIAO
 // Global objects
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-bool isDisplayConnected;
+bool displayConnected;
 // Prototypes
 bool setupDisplay(void);
 #define DEGREE_FONT (char)223
@@ -119,7 +119,7 @@ float getDesiredSurveyAccuracy(const char* path);
 void runSurvey(float desiredAccuracyInM, bool resp);
 double getLongitudeHp(void);
 double getLatitudeHp(void);
-double getHeightOverSeaLevelHp(void);
+// double getHeightOverSeaLevelHp(void);
 float getHeightOverSeaLevel(void);
 float getAccuracy(void);
 bool saveLocation(void);
@@ -231,7 +231,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
       const String status = "Survey already going";
       float meanAccuracy = myGNSS.getSurveyInMeanAccuracy();
       DEBUG_SERIAL.println(status);
-      if (isDisplayConnected) {
+      if (displayConnected) {
         display.clearDisplay();
         display.setCursor(0, 0);
         display.print("SSID: ");
@@ -261,7 +261,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
       {
         const String status = "Survey start failed";
         DEBUG_SERIAL.println(status);
-        if (isDisplayConnected) {
+        if (displayConnected) {
           display.clearDisplay();
           display.setCursor(0, 0);
           display.print(DEVICE_NAME);
@@ -298,7 +298,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
         DEBUG_SERIAL.print(F(" Accuracy: "));
         DEBUG_SERIAL.println(meanAccuracy); // Call the helper function
 
-        if (isDisplayConnected) {
+        if (displayConnected) {
           display.clearDisplay();
           display.setCursor(0, 0);
           display.print("SSID: ");
@@ -309,11 +309,9 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
           display.setCursor(0, 20);
           display.print("http://");display.print(DEVICE_NAME);display.print(".local");
           display.setCursor(0, 30);
-          display.print("Survey running");
-          display.setCursor(0, 40);
-          display.print(F("Elapsed: "));
+          display.print("Survey: ");
           display.print(secondsToTimeFormat(timeElapsed)); // Call the helper function
-          display.setCursor(0, 50);
+          display.setCursor(0, 40);
           display.print(F("Acc.: "));
           display.print(String(meanAccuracy)); // Call the helper function
           display.print(" -> ");
@@ -483,6 +481,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
     while (true) {
       // beginServing() func content
       // Connect if we are not already
+      taskStart:
       if (ntripCaster.connected() == false) {
           DEBUG_SERIAL.printf("Opening socket to %s\n", CASTER_HOST);
 
@@ -508,7 +507,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
             if (millis() - timeout > 5000) {
                 DEBUG_SERIAL.println(F("Caster timed out!"));
                 ntripCaster.stop();
-                // return;
+                goto taskStart;// return;
                 }
             delay(10);
             }
@@ -526,12 +525,12 @@ void task_rtk_wifi_connection(void *pvParameters) {
             if (connectionSuccess == false) {
                 DEBUG_SERIAL.print(F("Failed to connect to Caster: ")); 
                 DEBUG_SERIAL.println(response);
-                // return;
+                goto taskStart;// return;
                 }
             }  // End attempt to connect
             else {
                 DEBUG_SERIAL.println(F("Connection to host failed"));
-                // return;
+                goto taskStart;// return;
             }
         }  // End connected == false
 
@@ -550,7 +549,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
                 DEBUG_SERIAL.println(status);
                 ntripCaster.stop();
 
-                if (isDisplayConnected) {
+                if (displayConnected) {
                   display.clearDisplay();
                   display.setCursor(0,0);
                   display.print("ERROR, hang up!");
@@ -561,7 +560,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
                   display.print(status);
                   display.display();
                 }
-                // return;
+                goto taskStart;// return;
         }
 
         delay(10);
@@ -570,19 +569,23 @@ void task_rtk_wifi_connection(void *pvParameters) {
         if (millis() - lastReport_ms > 10000) {
             lastReport_ms += 10000;
             DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
+            printHighPrecisionPositionAndAccuracy();
 
             double latitudeHp = getLatitudeHp();
             double longitudeHp = getLongitudeHp();
             float altitude = getHeightOverSeaLevel();
             float accuracy = getAccuracy();
-            static float lastAccuracy = 100;
+            static float lastAccuracy = 100.0;
+            DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
+            DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
             bool shouldUpdateDisplay = true;
 
             if (lastAccuracy > accuracy) {
+              shouldUpdateDisplay = true;
               if (saveLocation()) {
                 DEBUG_SERIAL.println(F("Location updated"));
                 lastAccuracy = accuracy;
-                shouldUpdateDisplay = true;
+                
               } else {
                 DEBUG_SERIAL.println(F("Error saving location"));
               }
@@ -590,15 +593,12 @@ void task_rtk_wifi_connection(void *pvParameters) {
               shouldUpdateDisplay = false;
             }
 
-            if (isDisplayConnected && shouldUpdateDisplay) {
+            if (displayConnected && shouldUpdateDisplay) {
               display.clearDisplay();
 
               display.setCursor(0, 0);
               display.print(F("SSID: "));
               display.print(WiFi.SSID());
-              // display.setCursor(0, 10);
-              // display.print("IP: ");
-              // display.print(WiFi.localIP());
 
               display.setCursor(0, 10);
               display.print(F("http://"));
@@ -619,7 +619,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
               display.print("Alt: ");
               display.print(altitude, 4);
               display.print(F(" m"));
-              
+
               display.setCursor(0, 50);
               display.print(F("hAcc: "));
               display.print(accuracy, 4);
@@ -659,15 +659,15 @@ void buttonHandler(Button2 &btn) {
  * ****************************************************************************/
 
 bool setupDisplay() {
-  isDisplayConnected = false;
+  displayConnected = false;
   if (!display.begin(OLED_I2C_ADDR, true)) {
     DEBUG_SERIAL.println("Could not find SH110X? Check wiring");
     // while (true) delay(100);
   } else { // Address 0x3C default
-    isDisplayConnected = true;
+    displayConnected = true;
   }
  
-  if (isDisplayConnected) {
+  if (displayConnected) {
     display.display();
     delay(500);
 
@@ -683,7 +683,7 @@ bool setupDisplay() {
     display.display();
   }
 
-  return isDisplayConnected;
+  return displayConnected;
 }
 
 
@@ -777,12 +777,16 @@ bool saveLocation() {
     // int8_t ellipsoidHp = myGNSS.getElipsoidHp();
     int32_t msl = myGNSS.getMeanSeaLevel();
     int8_t mslHp = myGNSS.getMeanSeaLevelHp();
+    DEBUG_SERIAL.print("saveLocation: msl: ");DEBUG_SERIAL.print(msl);
+    DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
     // uint32_t accuracy = myGNSS.getHorizontalAccuracy();
     bool success = true;
     String csvStr = String(latitude) + SEP + String(latitudeHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LATITUDE, csvStr.c_str());
+    csvStr = "";
     csvStr = String(longitude) + SEP + String(longitudeHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE, csvStr.c_str());
+    csvStr = "";
     csvStr = String(msl) + SEP + String(mslHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
 
@@ -827,17 +831,17 @@ float getAccuracy() {
   return f_accuracy;
 }
 
-double getHeightOverSeaLevelHp() {
-  int32_t msl = myGNSS.getMeanSeaLevel();
-  int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-  double d_mslHp; // mean height over sea level
-  d_mslHp = ((double)msl) / 10000000.0; 
-  d_mslHp += ((double)mslHp) / 1000000000.0;
-  DEBUG_SERIAL.print("Height over sea in m: ");
-  DEBUG_SERIAL.println(d_mslHp, 9);
+// double getHeightOverSeaLevelHp() {
+//   int32_t msl = myGNSS.getMeanSeaLevel();
+//   int8_t mslHp = myGNSS.getMeanSeaLevelHp();
+//   double d_mslHp; // mean height over sea level
+//   d_mslHp = ((double)msl) / 10000000.0; 
+//   d_mslHp += ((double)mslHp) / 1000000000.0;
+//   DEBUG_SERIAL.print("Height over sea in m: ");
+//   DEBUG_SERIAL.println(d_mslHp, 9);
 
-  return d_mslHp;
-}
+//   return d_mslHp;
+// }
 
 float getHeightOverSeaLevel() {
   float f_msl;
@@ -847,7 +851,8 @@ float getHeightOverSeaLevel() {
   f_msl = (msl * 10) + mslHp;
   // Now convert to m
   f_msl = f_msl / 10000.0; // Convert from mm * 10^-1 to m
-  DEBUG_SERIAL.print(f_msl, 4); // Print the mean sea level with 4 decimal places
+  DEBUG_SERIAL.print("Alt.: ");
+  DEBUG_SERIAL.println(f_msl, 4); // Print the mean sea level with 4 decimal places
 
   return f_msl;
 }
