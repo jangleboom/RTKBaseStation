@@ -70,7 +70,7 @@ Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, 
 bool displayConnected;
 // Prototypes
 bool setupDisplay(void);
-#define DEGREE_FONT (char)223
+
 
 /*******************************************************************************
  *                                 Button(s)
