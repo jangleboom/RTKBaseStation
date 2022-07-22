@@ -2,7 +2,7 @@
 [submodule "lib/RTKBaseManager"]
 	path = lib/RTKBaseManager
 	url = https://github.com/audio-communication-group/RTKBaseManager.git
-	branch = main
+	branch = development
 
 [submodule "lib/ESPAsyncWebServer"]
 	path = lib/ESPAsyncWebServer

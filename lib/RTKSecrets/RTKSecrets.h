@@ -1,7 +1,7 @@
 #ifndef RTK_SECRETS_H
 #define RTK_SECRETS_H
 #include <Arduino.h>
-// A place for your caster credentials
+// A place for your default caster credentials
 
 /**
  * While a survey-in is easy to set up and fine for an in-the-field way to establish the location 
@@ -25,9 +25,7 @@
             6 	     0.000001 	0.111 m
             7 	     0.0000001 	1.11 cm
             8 	     0.00000001 1.11 mm
- */
-#define STATIC_POSITION false // If true, high precision coordinates are needed
-/*
+
 Units are cm with a high precision extension so -1234.5678 should be called: (-123456, -78)
 For more infomation see Example12_setStaticPosition
 Note: If you leave these coordinates in place and setup your antenna *not* at SparkFun, your receiver
@@ -48,56 +46,43 @@ WGS84_XYZ (geocentric)  ECEF-Z 5043750.593 or 5043752.317
 after running look here: http://new.rtk2go.com:2101/SNIP::STATUS
 */
 
-#ifdef STATIC_POSITION 
-// const int32_t ECEF_X_CM = 378251992;   // Earth-centered-X in cm
-// const int8_t ECEF_X_HP = 50;           // Earth-centered-X, high precision extension 0.1mm
-// const int32_t ECEF_Y_CM = 87338664;    // Earth-centered-Y in cm
-// const int8_t ECEF_Y_HP = 10;           // Earth-centered-Y, high precision extension 0.1mm
-// const int32_t ECEF_Z_CM = 504375059;   // Earth-centered-Z in cm
-// const int8_t ECEF_Z_HP = 30;           // Earth-centered-Z, high precision extension 0.1mm
 const int32_t ECEF_X_CM = 378252188;   // Earth-centered-X in cm
 const int8_t ECEF_X_HP = 02;           // Earth-centered-X, high precision extension 0.1mm
 const int32_t ECEF_Y_CM = 87338647;    // Earth-centered-Y in cm
 const int8_t ECEF_Y_HP = 32;           // Earth-centered-Y, high precision extension 0.1mm
 const int32_t ECEF_Z_CM = 504375230;   // Earth-centered-Z in cm
 const int8_t ECEF_Z_HP = 10;           // Earth-centered-Z, high precision extension 0.1mm
-// or use Lat/Long and Altitude:
-// const int32_t LATITUDE =  526013104;   // 7-digits (post comma)
-// const int8_t LATITUDE_HP = 70;         // high precision extension
-// const int32_t LONGITUDE = 130017704;   // 7-digits
-// const int8_t LONGITUDE_HP = 01;        // high precision extension
-// const int32_t ALTITUDE = 39000;        // Unit: mm
-// const int8_t ALTITUDE_HP = 0;          // high precision extension
+
 const int32_t LATITUDE =  526013065;   // 7-digits
 const int8_t LATITUDE_HP = 90;         // high precision extension
 const int32_t LONGITUDE = 130017615;   // 7-digits
 const int8_t LONGITUDE_HP = 00;        // high precision extension
 const int32_t ALTITUDE = 41500;        // Unit: mm
 const int8_t ALTITUDE_HP = 0;          // high precision extension
-#endif
+
 
 const float DESIRED_ACCURACY_M = 0.06;
 //RTK2Go MountPoint 1 http://new.rtk2go.com:2101/SNIP::STATUS
 // Email: mr.markuese@gmail.com
-const char casterHost[] = "rtk2go.com";
-const uint16_t casterPort = 2101;
-const char mountPoint[] = "headtracker2punkt0"; //The mount point you want to push data to
+const char CASTER_HOST[] = "rtk2go.com";
+const uint16_t CASTER_PORT = 2101;
+const char MOUNT_POUNT[] = "headtracker2punkt0"; //The mount point you want to push data to
 // const char mountPointPW[] = "WEEK2208";
 const char mountPointPW[] = "h34dtR4ck3R";
 const int CONNECTION_TIMEOUT_MS = 10000; // Shorter timeouts lead to complaining email and ban
 
 //RTK2Go MountPoint 2 http://new.rtk2go.com:2101/SNIP::STATUS
 // Email: christian-schreck@mail.de
-// const char casterHost[] = "rtk2go.com";
-// const uint16_t casterPort = 2101;
-// const char mountPoint[] = "HEADTRACKER2PUNKT0"; //The mount point you want to push data to
+// const char CASTER_HOST[] = "rtk2go.com";
+// const uint16_t CASTER_PORT = 2101;
+// const char MOUNT_POUNT[] = "HEADTRACKER2PUNKT0"; //The mount point you want to push data to
 // const char mountPointPW[] = "WEEK2208";
 
 //Emlid Caster MountPoint 1
 // Email: mr.markuese@gmail.com
-// const char casterHost[] = "caster.emlid.com";
-// const uint16_t casterPort = 2101;
-// const char mountPoint[] = "MP7156"; //The mount point you want to push data to
+// const char CASTER_HOST[] = "caster.emlid.com";
+// const uint16_t CASTER_PORT = 2101;
+// const char MOUNT_POUNT[] = "MP7156"; //The mount point you want to push data to
 // const char mountPointPW[] = "732taa";
 
 #endif /*** RTK_SECRETS_H ***/

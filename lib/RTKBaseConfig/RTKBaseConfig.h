@@ -39,7 +39,7 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 //  * @return uint32_t Chip Id
 //  */
 // uint32_t getChipId(void);
-#define DEVICE_NAME "RTKBase"
+#define DEVICE_NAME "rtkbase"
 
 /*******************************************************************************
  *                         Default RTK settings 
