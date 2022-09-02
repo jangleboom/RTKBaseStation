@@ -460,9 +460,10 @@ void task_rtk_wifi_connection(void *pvParameters) {
     credentialsExists &= !mountPoint.isEmpty();
     credentialsExists &= !mountPointPW.isEmpty();
     
-    if (!credentialsExists) {
+    while (!credentialsExists) {
       DEBUG_SERIAL.println("RTK Credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
-      while (true) {};
+      vTaskDelay(1000);
+      //TODO: display status
     }
 
     String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
