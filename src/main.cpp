@@ -129,7 +129,6 @@ void task_rtk_wifi_connection(void *pvParameters);
 // Help funcs
 String secondsToTimeFormat(uint32_t sec);
 
-
 void setup() {
   Wire.begin();
   #ifdef DEBUGGING
@@ -222,8 +221,9 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     if (response == false)
     {
       DEBUG_SERIAL.println(F("Failed to get Survey In status. Freezing."));
-      while (1)
-        ; //Freeze
+      while (true) {
+        delay(1000);
+      }; //Freeze
     }
 
     if (myGNSS.getSurveyInActive() == true) // Use the helper function
@@ -241,12 +241,14 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
         display.print(WiFi.localIP());
         display.setCursor(0, 20);
         display.print("http://"); display.print(DEVICE_NAME); display.print(".local");
-        display.setCursor(0, 40);
+        display.setCursor(0, 30);
         display.print(status);
-        display.setCursor(0, 50);
-        display.print(F("Acc.: "));
+        display.setCursor(0, 40);
+        display.print(F("current Acc.: "));
         display.print(String(meanAccuracy)); // Call the helper function
-        display.print(" -> ");
+        display.print(F(" m"));
+        display.setCursor(0, 50);
+        display.print("target Acc.: ");
         display.print(String(desiredAccuracyInM)); // Call the helper function
         display.print(F(" m"));
         display.display();
@@ -272,8 +274,9 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
           display.display();
         }
    
-        while (1)
-          ;
+        while (true) {
+          delay(1000);
+        };
       }
     DEBUG_SERIAL.print(F("Survey started. This will run until 60s has passed and less than "));
     DEBUG_SERIAL.print(desiredAccuracyInM);
@@ -312,21 +315,25 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
           display.print("Survey: ");
           display.print(secondsToTimeFormat(timeElapsed)); // Call the helper function
           display.setCursor(0, 40);
-          display.print(F("Acc.: "));
+          display.print(F("current Acc.: "));
           display.print(String(meanAccuracy)); // Call the helper function
-          display.print(" -> ");
+          display.print(F(" m"));
+          display.setCursor(0, 50);
+          display.print("target Acc.: ");
           display.print(String(desiredAccuracyInM)); // Call the helper function
           display.print(F(" m"));
           display.display();
         }
-   
+
       }
+
       else {
         DEBUG_SERIAL.println(F("SVIN request failed"));
       }
 
       delay(1000);
     }
+    
     DEBUG_SERIAL.println(F("Survey valid!"));
     DEBUG_SERIAL.println(F("Accuracy"));
     DEBUG_SERIAL.print(getAccuracy()); 
@@ -346,7 +353,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
 void setupRTKBase(bool surveyEnabled) {
   if (myGNSS.begin(Wire) == false) {
     DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
-    while (1) {
+    while (true) {
         delay(1000);
         }
   }
@@ -367,8 +374,9 @@ void setupRTKBase(bool surveyEnabled) {
 
   if (response == false) {
     DEBUG_SERIAL.println(F("Failed to disable NMEA. Freezing..."));
-    while (1)
-      ;
+    while (true) {
+        delay(1000);
+      }
   } else
     DEBUG_SERIAL.println(F("NMEA disabled"));
 
@@ -382,8 +390,9 @@ void setupRTKBase(bool surveyEnabled) {
 
   if (response == false) {
     DEBUG_SERIAL.println(F("Failed to enable RTCM. Freezing..."));
-    while (1)
-      ;
+    while (true) {
+      delay(1000);
+    }
   } else
     DEBUG_SERIAL.println(F("RTCM sentences enabled"));
 
@@ -397,8 +406,9 @@ void setupRTKBase(bool surveyEnabled) {
     //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
     if (response == false) {
       DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
-      while (1)
-        ;
+      while (true) {
+        delay(1000);
+      }
     } else {
       DEBUG_SERIAL.println(F("Static position set"));
     }
@@ -409,7 +419,6 @@ void setupRTKBase(bool surveyEnabled) {
   }
   
   DEBUG_SERIAL.println(F("Module failed to save"));
-  
 
 /* 
   ECEF coordinates: Example tiny office Brieslang
@@ -424,9 +433,9 @@ void setupRTKBase(bool surveyEnabled) {
 // Useful for passing the RTCM correction data to a radio, Ntrip broadcaster, etc.
 void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
     if (ntripCaster.connected() == true) {
-    ntripCaster.write(incoming);  //Send this byte to socket
-    serverBytesSent++;
-    lastSentRTCM_ms = millis();
+      ntripCaster.write(incoming);  //Send this byte to socket
+      serverBytesSent++;
+      lastSentRTCM_ms = millis();
   }
 }
 
@@ -526,12 +535,12 @@ void task_rtk_wifi_connection(void *pvParameters) {
             if (connectionSuccess == false) {
                 DEBUG_SERIAL.print(F("Failed to connect to Caster: ")); 
                 DEBUG_SERIAL.println(response);
-                goto taskStart;// return;
+                goto taskStart; // replaces the return command of the SparkFun example (a task must not return)
                 }
             }  // End attempt to connect
             else {
                 DEBUG_SERIAL.println(F("Connection to host failed"));
-                goto taskStart;// return;
+                goto taskStart; // replaces the return command of the SparkFun example (a task must not return)
             }
         }  // End connected == false
 
@@ -602,9 +611,11 @@ void task_rtk_wifi_connection(void *pvParameters) {
               display.print(WiFi.SSID());
 
               display.setCursor(0, 10);
-              display.print(F("http://"));
-              display.print(DEVICE_NAME);
-              display.print(F(".local"));
+              display.print(F("IP: "));
+              display.print(WiFi.localIP());
+              // display.print(F("http://"));
+              // display.print(DEVICE_NAME);
+              // display.print(F(".local"));
 
               display.setCursor(0, 20);
               display.print(F("Lat: "));
