@@ -49,7 +49,6 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 // #define RTK_SCL_PIN                 32
 #define I2C_FREQUENCY_100K            100000  // 100 kHz
 #define I2C_FREQUENCY_400K            400000  // 400 kHz
-// // ! see secrets.h for default location data
 
 /*******************************************************************************
  *                         Oled
@@ -62,9 +61,9 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 #define RUNNING_CORE_1                1  // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
-#define GNSS_OVER_WIFI_PRIORITY       2  // GNSS should have a lower priority
+#define GNSS_WIFI_PRIORITY             2  // GNSS/WiFi should have a lower priority
 #define RTK_TASK_INTERVAL_MS          10
-
+#define CHECK_WIFI_INTERVAL_MS        30000
 /*******************************************************************************
  *                         Help Functions
  * ****************************************************************************/

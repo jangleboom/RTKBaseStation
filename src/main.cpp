@@ -78,7 +78,7 @@ bool setupDisplay(void);
 #include "Button2.h"
 // Button to press to wipe out stored WiFi credentials
 const int BUTTON_PIN = 15;
-Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
+Button2 wipeButton = Button2(BUTTON_PIN, INPUT, false, false);
 
 void buttonHandler(Button2 &btn);
 
@@ -124,8 +124,9 @@ float getHeightOverSeaLevel(void);
 float getAccuracy(void);
 bool saveLocation(void);
 void printHighPrecisionPositionAndAccuracy(void);
-void task_rtk_wifi_connection(void *pvParameters);
-
+void task_rtk_server_connection(void *pvParameters);
+// void task_check_wifi_connection(void *pvParameters);
+// static SemaphoreHandle_t bin_sem_check_wifi = NULL; 
 // Help funcs
 String secondsToTimeFormat(uint32_t sec);
 
@@ -136,6 +137,7 @@ void setup() {
   while (!Serial) {};
   #endif
   
+  setupDisplay();
   
   // //Disable survey
   // DEBUG_SERIAL.print(F("Survey stopped: "));
@@ -144,7 +146,7 @@ void setup() {
   // myGNSS.disableSurveyMode();  // Call if RTK device should be restarted on ESP32 start
   // Initialize SPIFFS, set true for formatting (at first time running is a must)
   bool format = false;
-  if (!RTKBaseManager::setupSPIFFS(format)) {
+  if (!setupSPIFFS(format)) {
     DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing"));
     while (true) {};
   }
@@ -159,7 +161,7 @@ void setup() {
     printIntLocation(&lastLocation);
   }
 
-  button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
+  wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
@@ -176,10 +178,16 @@ void setup() {
    delay(500);
  }
   startServer(&server);
-  
-  setupDisplay();
+         
+  // bin_sem_check_wifi = xSemaphoreCreateBinary();
+   // Force reboot if we can't create the semaphore
+  // if (bin_sem_check_wifi == NULL) {
+  //   DEBUG_SERIAL.println("Could not create semaphore(s)");
+  //   ESP.restart();
+  // }
 
-  xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  // xTaskCreatePinnedToCore( &task_check_wifi_connection, "task_check_wifi_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   
   String thisBoard = ARDUINO_BOARD;
   DEBUG_SERIAL.print(F("Setup done on "));
@@ -192,7 +200,7 @@ void loop() {
     // DEBUG_SERIAL.println(F("Running Tests..."));
     // aunit::TestRunner::run();
     // #endif
-    button.loop();
+    wipeButton.loop();
 }
 
 /*******************************************************************************
@@ -234,22 +242,22 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
       if (displayConnected) {
         display.clearDisplay();
         display.setCursor(0, 0);
-        display.print("SSID: ");
+        display.print(F("SSID: "));
         display.print(WiFi.SSID());
         display.setCursor(0, 10);
-        display.print("IP: ");
+        display.print(F("IP: "));
         display.print(WiFi.localIP());
         display.setCursor(0, 20);
-        display.print("http://"); display.print(DEVICE_NAME); display.print(".local");
+        display.print(F("http://")); display.print(DEVICE_NAME); display.print(F(".local"));
         display.setCursor(0, 30);
         display.print(status);
         display.setCursor(0, 40);
         display.print(F("current Acc.: "));
-        display.print(String(meanAccuracy)); // Call the helper function
+        display.print(String(meanAccuracy).c_str()); // Call the helper function
         display.print(F(" m"));
         display.setCursor(0, 50);
-        display.print("target Acc.: ");
-        display.print(String(desiredAccuracyInM)); // Call the helper function
+        display.print(F("target Acc.: "));
+        display.print(String(desiredAccuracyInM).c_str()); // Call the helper function
         display.print(F(" m"));
         display.display();
       }
@@ -301,26 +309,32 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
         DEBUG_SERIAL.print(F(" Accuracy: "));
         DEBUG_SERIAL.println(meanAccuracy); // Call the helper function
 
+        if (checkConnectionToWifiStation()) {
+          DEBUG_SERIAL.println(F("WiFi connection established"));
+        } else {
+          DEBUG_SERIAL.println(F("Error connecting to WiFi station"));
+        };
+
         if (displayConnected) {
           display.clearDisplay();
           display.setCursor(0, 0);
-          display.print("SSID: ");
+          display.print(F("SSID: "));
           display.print(WiFi.SSID());
           display.setCursor(0, 10);
-          display.print("IP: ");
+          display.print(F("IP: "));
           display.print(WiFi.localIP());
           display.setCursor(0, 20);
-          display.print("http://");display.print(DEVICE_NAME);display.print(".local");
+          display.print(F("http://"));display.print(DEVICE_NAME);display.print(F(".local"));
           display.setCursor(0, 30);
-          display.print("Survey: ");
+          display.print(F("Survey: "));
           display.print(secondsToTimeFormat(timeElapsed)); // Call the helper function
           display.setCursor(0, 40);
           display.print(F("current Acc.: "));
-          display.print(String(meanAccuracy)); // Call the helper function
+          display.print(String(meanAccuracy).c_str()); // Call the helper function
           display.print(F(" m"));
           display.setCursor(0, 50);
           display.print("target Acc.: ");
-          display.print(String(desiredAccuracyInM)); // Call the helper function
+          display.print(String(desiredAccuracyInM).c_str()); // Call the helper function
           display.print(F(" m"));
           display.display();
         }
@@ -443,13 +457,25 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
  *                                 WiFi
  * ****************************************************************************/
 
-void task_rtk_wifi_connection(void *pvParameters) {
+// void task_check_wifi_connection(void *pvParameters) {
+//     (void)pvParameters;
+//     bool wifiConnected;
+//     while (true) {
+//       wifiConnected = checkConnectionToWifiStation();
+//       wifiConnected ? (xSemaphoreGive(bin_sem_check_wifi) : (xSemaphoreTake(bin_sem_check_wifi)))
+//       vTaskDelay(CHECK_WIFI_INTERVAL_MS/portTICK_PERIOD_MS);
+//     }
+//     // Delete self task
+//     vTaskDelete(NULL);
+// }
+
+void task_rtk_server_connection(void *pvParameters) {
     (void)pvParameters;
     Wire.setClock(I2C_FREQUENCY_100K);
     // Measure stack size
     // UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DEBUG_SERIAL.print(F("task_rtk_wifi_connection setup, uxHighWaterMark: "));
+    // DEBUG_SERIAL.print(F("task_rtk_server_connection setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
 
     bool connectionSuccess = false;
@@ -471,6 +497,27 @@ void task_rtk_wifi_connection(void *pvParameters) {
     
     while (!credentialsExists) {
       DEBUG_SERIAL.println("RTK Credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
+      if (displayConnected) {
+        display.clearDisplay();
+        display.setCursor(0,0);
+        display.print(F("STOP, enter wifi+rtk"));
+        display.setCursor(0,10);
+        display.print(F("credentials first!"));
+        display.setCursor(0,20);
+        display.print(F("Go to access point: "));
+        display.setCursor(0,30);
+        display.print(F("SSID: "));
+        display.print(AP_SSID);
+        display.setCursor(0,40);
+        display.print(F("PW: "));
+        display.print(AP_PASSWORD);
+        display.setCursor(0,50);
+        display.print(F("IP: "));
+        display.print(IP_AP);
+        display.display();
+      }
+      
+      
       vTaskDelay(1000);
       //TODO: display status
     }
@@ -485,13 +532,14 @@ void task_rtk_wifi_connection(void *pvParameters) {
                       latitude.isEmpty() || \
                       longitude.isEmpty() || \
                       altitude.isEmpty();
-    DEBUG_SERIAL.printf("task_rtk_wifi_connection, surveyEnabled: %d", surveyEnabled);
+    DEBUG_SERIAL.printf("task_rtk_server_connection, surveyEnabled: %s\n", surveyEnabled ? "yes" : "no");
     setupRTKBase(surveyEnabled);
 
     while (true) {
       // beginServing() func content
       // Connect if we are not already
       taskStart:
+
       if (ntripCaster.connected() == false) {
           DEBUG_SERIAL.printf("Opening socket to %s\n", CASTER_HOST);
 
@@ -535,11 +583,13 @@ void task_rtk_wifi_connection(void *pvParameters) {
             if (connectionSuccess == false) {
                 DEBUG_SERIAL.print(F("Failed to connect to Caster: ")); 
                 DEBUG_SERIAL.println(response);
+                checkConnectionToWifiStation();
                 goto taskStart; // replaces the return command of the SparkFun example (a task must not return)
                 }
             }  // End attempt to connect
             else {
                 DEBUG_SERIAL.println(F("Connection to host failed"));
+                checkConnectionToWifiStation();
                 goto taskStart; // replaces the return command of the SparkFun example (a task must not return)
             }
         }  // End connected == false
@@ -588,22 +638,25 @@ void task_rtk_wifi_connection(void *pvParameters) {
             static float lastAccuracy = 100.0;
             DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
             DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
-            bool shouldUpdateDisplay = true;
+            bool shouldUpdateDisplay;
 
             if (lastAccuracy > accuracy) {
               shouldUpdateDisplay = true;
               if (saveLocation()) {
                 DEBUG_SERIAL.println(F("Location updated"));
+                // Update PARAM_RTK_LOCATION_METHOD
+                // setLocationMethodCoords();
                 lastAccuracy = accuracy;
                 
               } else {
                 DEBUG_SERIAL.println(F("Error saving location"));
               }
-            } else {
-              shouldUpdateDisplay = false;
-            }
+            } 
+            // else {
+            //   shouldUpdateDisplay = false;
+            // }
 
-            if (displayConnected && shouldUpdateDisplay) {
+            if (displayConnected /*&& shouldUpdateDisplay*/) {
               display.clearDisplay();
 
               display.setCursor(0, 0);
@@ -636,11 +689,18 @@ void task_rtk_wifi_connection(void *pvParameters) {
               display.display();
             }
           }
-        }
+        } // End while (ntripCaster.connected() == true)
+
+        // If connection lost, first check WiFi
+        if (checkConnectionToWifiStation()) {
+          DEBUG_SERIAL.println(F("WiFi connection established"));
+        } else {
+          DEBUG_SERIAL.println(F("Error connecting to WiFi station"));
+        };
 
         // Measure stack size (last was 17772)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_rtk_wifi_connection loop, uxHighWaterMark: "));
+        // DEBUG_SERIAL.print(F("task_rtk_server_connection loop, uxHighWaterMark: "));
         // DEBUG_SERIAL.println(uxHighWaterMark);
         vTaskDelay(RTK_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
     }
@@ -655,7 +715,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
  * ****************************************************************************/
 
 void buttonHandler(Button2 &btn) {
-  if (btn == button) {
+  if (btn == wipeButton) {
     digitalWrite(LED_BUILTIN, HIGH);
     DEBUG_SERIAL.println(F("Wiping WiFi credentials and RTK settings from memory..."));
     wipeSpiffsFiles();
