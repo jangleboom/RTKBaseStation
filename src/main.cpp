@@ -613,9 +613,6 @@ void task_rtk_wifi_connection(void *pvParameters) {
               display.setCursor(0, 10);
               display.print(F("IP: "));
               display.print(WiFi.localIP());
-              // display.print(F("http://"));
-              // display.print(DEVICE_NAME);
-              // display.print(F(".local"));
 
               display.setCursor(0, 20);
               display.print(F("Lat: "));
