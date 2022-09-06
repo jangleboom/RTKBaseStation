@@ -139,7 +139,7 @@ void setup() {
   // Initialize SPIFFS, set true for formatting (at first time running is a must)
   bool format = false;
   if (!setupSPIFFS(format)) {
-    DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing"));
+    DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing..."));
     while (true) {};
   }
 
@@ -172,7 +172,6 @@ void setup() {
   startServer(&server);
 
   xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  // xTaskCreatePinnedToCore( &task_check_wifi_connection, "task_check_wifi_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   
   String thisBoard = ARDUINO_BOARD;
   DEBUG_SERIAL.print(F("Setup done on "));
@@ -393,8 +392,6 @@ void setupRTKBase(bool surveyEnabled) {
     runSurvey(desiredAcc, response);
   }
   
-  DEBUG_SERIAL.println(F("Module failed to save"));
-
 /* 
   after running look here for your mountpoint: http://new.rtk2go.com:2101/SNIP::STATUS
 */
@@ -419,6 +416,7 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
 
 void task_rtk_server_connection(void *pvParameters) {
     (void)pvParameters;
+
     Wire.setClock(I2C_FREQUENCY_100K);
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
@@ -487,11 +485,14 @@ void task_rtk_server_connection(void *pvParameters) {
 
       // Connect if we are not already
       if (ntripCaster.connected() == false) {
-          DEBUG_SERIAL.printf("Opening socket to %s\n", CASTER_HOST);
+          DEBUG_SERIAL.print(F("Opening socket to "));
+          DEBUG_SERIAL.println(casterHost.c_str());
 
         if (ntripCaster.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == true)  //Attempt connection
         {
-            DEBUG_SERIAL.printf("Connected to %s:%d\n", casterHost.c_str(), (uint16_t)casterPort.toInt());
+            DEBUG_SERIAL.print(F("Connected to %s:%d\n"));
+            DEBUG_SERIAL.print(casterHost.c_str());
+            DEBUG_SERIAL.println((uint16_t)casterPort.toInt());
 
             const int SERVER_BUFFER_SIZE = 512;
             char serverRequest[SERVER_BUFFER_SIZE];

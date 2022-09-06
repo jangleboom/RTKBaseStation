@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef RTKBASE_CONFIG_H
+#define RTKBASE_CONFIG_H
 #include <Arduino.h>
 
 // Deactivate brown out detection
@@ -10,7 +10,7 @@
 //                       Default Serial settings
 /******************************************************************************/
 //set to true for debug output, false for no debug output
-#define DEBUGGING true
+#define DEBUGGING false
 #define DEBUG_SERIAL \
   if (DEBUGGING) Serial
 
@@ -63,13 +63,13 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
 #define GNSS_WIFI_PRIORITY             2  // GNSS/WiFi should have a lower priority
 #define RTK_TASK_INTERVAL_MS          10
-#define CHECK_WIFI_INTERVAL_MS        30000
+
 /*******************************************************************************
  *                         Help Functions
  * ****************************************************************************/
 
 
-#endif /*** HTRTK_CONFIG_H ***/
+#endif /*** RTKBASE_CONFIG_H ***/
 
 
 
