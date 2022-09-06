@@ -229,64 +229,36 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
       }; //Freeze
     }
 
-    // if (myGNSS.getSurveyInActive() == true) // Use the helper function
     while (myGNSS.getSurveyInActive() == true) 
     { myGNSS.disableSurveyMode();
       delay(500);
-      // const String status = "Survey already going";
-      // float meanAccuracy = myGNSS.getSurveyInMeanAccuracy();
-      // DEBUG_SERIAL.println(status);
-      // if (displayConnected) {
-      //   display.clearDisplay();
-      //   display.setCursor(0, 0);
-      //   display.print(F("SSID: "));
-      //   display.print(WiFi.SSID());
-      //   display.setCursor(0, 10);
-      //   display.print(F("IP: "));
-      //   display.print(WiFi.localIP());
-      //   display.setCursor(0, 20);
-      //   display.print(F("http://")); display.print(DEVICE_NAME); display.print(F(".local"));
-      //   display.setCursor(0, 30);
-      //   display.print(status);
-      //   display.setCursor(0, 40);
-      //   display.print(F("current Acc.: "));
-      //   display.print(String(meanAccuracy).c_str()); // Call the helper function
-      //   display.print(F(" m"));
-      //   display.setCursor(0, 50);
-      //   display.print(F("target Acc.: "));
-      //   display.print(String(desiredAccuracyInM).c_str()); // Call the helper function
-      //   display.print(F(" m"));
-      //   display.display();
-      // }
     }
-    // else
-    // {
-      //Start survey
-      // response = myGNSS.enableSurveyModeFull(60, 1.0); //Enable Survey in, 60 seconds, 1.0m
-      response = myGNSS.enableSurveyModeFull(60, desiredAccuracyInM); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
-      if (response == false)
-      {
-        const String status = "Survey start failed.";
-        DEBUG_SERIAL.println(status); DEBUG_SERIAL.println(F("Freezing..."));
-        if (displayConnected) {
-          display.clearDisplay();
-          display.setCursor(0, 0);
-          display.print(DEVICE_NAME);
-          display.setCursor(0, 20);
-          display.print(status);
-          display.setCursor(0, 40);
-          display.print(F("Freezing..."));
-          display.display();
-        }
-   
-        while (true) {
-          delay(1000);
-        };
+ 
+    //Start survey
+    // response = myGNSS.enableSurveyModeFull(60, 1.0); //Enable Survey in, 60 seconds, 1.0m
+    response = myGNSS.enableSurveyModeFull(60, desiredAccuracyInM); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
+    if (response == false)
+    {
+      const String status = "Survey start failed.";
+      DEBUG_SERIAL.println(status); DEBUG_SERIAL.println(F("Freezing..."));
+      if (displayConnected) {
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        display.print(DEVICE_NAME);
+        display.setCursor(0, 20);
+        display.print(status);
+        display.setCursor(0, 40);
+        display.print(F("Freezing..."));
+        display.display();
       }
+  
+      while (true) {
+        delay(1000);
+      };
+    }
     DEBUG_SERIAL.print(F("Survey started. This will run until 60s has passed and less than "));
     DEBUG_SERIAL.print(desiredAccuracyInM);
     DEBUG_SERIAL.println(F(" mm accuracy is achieved."));
-    // }
 
     //Begin waiting for survey to complete
     while (myGNSS.getSurveyInValid() == false) // Call the helper function
