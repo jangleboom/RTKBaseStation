@@ -139,11 +139,6 @@ void setup() {
   
   setupDisplay();
   
-  // //Disable survey
-  // DEBUG_SERIAL.print(F("Survey stopped: "));
-  // DEBUG_SERIAL.println(myGNSS.disableSurveyMode());
-
-  // myGNSS.disableSurveyMode();  // Call if RTK device should be restarted on ESP32 start
   // Initialize SPIFFS, set true for formatting (at first time running is a must)
   bool format = false;
   if (!setupSPIFFS(format)) {
@@ -265,12 +260,12 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     else
     {
       //Start survey
-      response = myGNSS.enableSurveyModeFull(60, desiredAccuracyInM); //Enable Survey in, 60 seconds, 1.0m
-      // response = myGNSS.enableSurveyMode(60, desiredAccuracyInM); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
+      // response = myGNSS.enableSurveyModeFull(60, 1.0); //Enable Survey in, 60 seconds, 1.0m
+      response = myGNSS.enableSurveyMode(60, desiredAccuracyInM); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
       if (response == false)
       {
-        const String status = "Survey start failed";
-        DEBUG_SERIAL.println(status);
+        const String status = "Survey start failed.";
+        DEBUG_SERIAL.println(status); DEBUG_SERIAL.println(F("Freezing..."));
         if (displayConnected) {
           display.clearDisplay();
           display.setCursor(0, 0);
@@ -371,7 +366,13 @@ void setupRTKBase(bool surveyEnabled) {
         delay(1000);
         }
   }
-    
+  // myGNSS.softwareResetGNSSOnly(); DEBUG_SERIAL.println(F("myGNSS softwareResetGNSSOnly"));  // Controlled Software Reset (GNSS only) only restarts the GNSS tasks, without reinitializing the full system or reloading any stored configuration.
+  // myGNSS.hardReset(); DEBUG_SERIAL.println(F("myGNSS hard reset"));                      // Perform a reset leading to a cold start (zero info start-up)
+  // myGNSS.factoryDefault(); DEBUG_SERIAL.println(F("myGNSS factoryDefault"));             // Reset module to factory defaults
+  // myGNSS.factoryReset(); DEBUG_SERIAL.println(F("myGNSS factoryReset()"));            // Send factory reset sequence (i.e. load "default" configuration and perform hardReset)
+  // delay(1000);
+
+  
   myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_RTCM3 | COM_TYPE_NMEA);  //UBX+RTCM3 is not a valid option so we enable all three.
   // myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save the communications port settings to flash and BBR
   myGNSS.setNavigationFrequency(1);  //Set output in Hz. RTCM rarely benefits from >1Hz.
@@ -473,7 +474,7 @@ void task_rtk_server_connection(void *pvParameters) {
     (void)pvParameters;
     Wire.setClock(I2C_FREQUENCY_100K);
     // Measure stack size
-    // UBaseType_t uxHighWaterMark; 
+    UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     // DEBUG_SERIAL.print(F("task_rtk_server_connection setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
@@ -528,10 +529,10 @@ void task_rtk_server_connection(void *pvParameters) {
     String altitude = readFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE);
     bool surveyEnabled = true;
     surveyEnabled &=  locationMethod.isEmpty() || \
-                      locationMethod.equals("survey_enabled") || \
-                      latitude.isEmpty() || \
-                      longitude.isEmpty() || \
-                      altitude.isEmpty();
+                      locationMethod.equals("survey_enabled");   
+                      // latitude.isEmpty() || \
+                      // longitude.isEmpty() || \
+                      // altitude.isEmpty();
     DEBUG_SERIAL.printf("task_rtk_server_connection, surveyEnabled: %s\n", surveyEnabled ? "yes" : "no");
     setupRTKBase(surveyEnabled);
 
@@ -565,7 +566,7 @@ void task_rtk_server_connection(void *pvParameters) {
             if (millis() - timeout > 5000) {
                 DEBUG_SERIAL.println(F("Caster timed out!"));
                 ntripCaster.stop();
-                goto taskStart;// return;
+                goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             delay(10);
             }
@@ -573,7 +574,7 @@ void task_rtk_server_connection(void *pvParameters) {
             // Check reply
             while (ntripCaster.available()) {
               response[responseSpot++] = ntripCaster.read();
-            if (strstr(response, "200") > 0)  //Look for 'ICY 200 OK'
+            if (strstr(response, "200") > 0)  // Look for 'ICY 200 OK'
                 connectionSuccess = true;
             if (responseSpot == 512 - 1)
                 break;
@@ -583,14 +584,33 @@ void task_rtk_server_connection(void *pvParameters) {
             if (connectionSuccess == false) {
                 DEBUG_SERIAL.print(F("Failed to connect to Caster: ")); 
                 DEBUG_SERIAL.println(response);
+                if (String(response).equals("ICY 401 Unauthorized")) {
+                  DEBUG_SERIAL.println("You are banned from rtk2go.com!");
+
+                  if (displayConnected) {
+                    display.clearDisplay();
+                    display.setCursor(0,0);
+                    display.print("STOP");
+                    display.setCursor(0,10);
+                    display.print("Your IP was banned");
+                    display.setCursor(0,20);
+                    display.print("from NTRIP Caster!");
+                    display.setCursor(0,30);
+                    display.print("Check your NTRIP");
+                    display.setCursor(0,40);
+                    display.print("Client settings!");
+                  }
+                }
                 checkConnectionToWifiStation();
-                goto taskStart; // replaces the return command of the SparkFun example (a task must not return)
+                vTaskDelay(1000);
+                goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             }  // End attempt to connect
             else {
                 DEBUG_SERIAL.println(F("Connection to host failed"));
                 checkConnectionToWifiStation();
-                goto taskStart; // replaces the return command of the SparkFun example (a task must not return)
+                vTaskDelay(1000);
+                goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
             }
         }  // End connected == false
 
@@ -627,67 +647,68 @@ void task_rtk_server_connection(void *pvParameters) {
 
         //Report some statistics every 10000
         if (millis() - lastReport_ms > 10000) {
-            lastReport_ms += 10000;
-            DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
-            printHighPrecisionPositionAndAccuracy();
+          lastReport_ms += 10000;
+          DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
+          printHighPrecisionPositionAndAccuracy();
 
-            double latitudeHp = getLatitudeHp();
-            double longitudeHp = getLongitudeHp();
-            float altitude = getHeightOverSeaLevel();
-            float accuracy = getAccuracy();
-            static float lastAccuracy = 100.0;
-            DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
-            DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
-            bool shouldUpdateDisplay;
+          double latitudeHp = getLatitudeHp();
+          double longitudeHp = getLongitudeHp();
+          float altitude = getHeightOverSeaLevel();
+          float accuracy = getAccuracy();
+          static float lastAccuracy = 100.0;
+          DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
+          DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
+          
 
-            if (lastAccuracy > accuracy) {
-              shouldUpdateDisplay = true;
-              if (saveLocation()) {
-                DEBUG_SERIAL.println(F("Location updated"));
-                // Update PARAM_RTK_LOCATION_METHOD
-                // setLocationMethodCoords();
-                lastAccuracy = accuracy;
-                
-              } else {
-                DEBUG_SERIAL.println(F("Error saving location"));
-              }
-            } 
-            // else {
-            //   shouldUpdateDisplay = false;
-            // }
-
-            if (displayConnected /*&& shouldUpdateDisplay*/) {
-              display.clearDisplay();
-
-              display.setCursor(0, 0);
-              display.print(F("SSID: "));
-              display.print(WiFi.SSID());
-
-              display.setCursor(0, 10);
-              display.print(F("IP: "));
-              display.print(WiFi.localIP());
-
-              display.setCursor(0, 20);
-              display.print(F("Lat: "));
-              display.print(latitudeHp, 9);
-              display.print(F(" deg"));
-
-              display.setCursor(0, 30);
-              display.print("Lon: ");
-              display.print(longitudeHp, 9);
-              display.print(F(" deg"));
-
-              display.setCursor(0, 40);
-              display.print("Alt: ");
-              display.print(altitude, 4);
-              display.print(F(" m"));
-
-              display.setCursor(0, 50);
-              display.print(F("hAcc: "));
-              display.print(accuracy, 4);
-              display.print(F(" m"));
-              display.display();
+          if (lastAccuracy > accuracy) {
+            if (saveLocation()) {
+              DEBUG_SERIAL.println(F("Location updated"));
+              lastAccuracy = accuracy;
+              
+            } else {
+              DEBUG_SERIAL.println(F("Error saving location"));
             }
+          } 
+
+          if (displayConnected) {
+            static int8_t displayRefereshCnt = 0;
+            displayRefereshCnt++;
+            displayRefereshCnt %= 4;
+            display.clearDisplay();
+
+            display.setCursor(0, 0);
+            display.print(F("SSID: "));
+            display.print(WiFi.SSID());
+
+            display.setCursor(0, 10);
+            display.print(F("IP: "));
+            display.print(WiFi.localIP());
+
+            display.setCursor(0, 20);
+            display.print(F("Lat: "));
+            display.print(latitudeHp, 9);
+            display.print(F(" deg"));
+
+            display.setCursor(0, 30);
+            display.print("Lon: ");
+            display.print(longitudeHp, 9);
+            display.print(F(" deg"));
+
+            display.setCursor(0, 40);
+            display.print("Alt: ");
+            display.print(altitude, 4);
+            display.print(F(" m"));
+
+            display.setCursor(0, 50);
+            display.print(F("hAcc: "));
+            display.print(accuracy, 4);
+            display.print(F(" m   "));
+            if (displayRefereshCnt == 0) display.print(F("|"));
+            if (displayRefereshCnt == 1) display.print(F("||"));
+            if (displayRefereshCnt == 2) display.print(F("|||"));
+            if (displayRefereshCnt == 3) display.print(F("||||"));
+            display.display();
+          }
           }
         } // End while (ntripCaster.connected() == true)
 
@@ -699,9 +720,9 @@ void task_rtk_server_connection(void *pvParameters) {
         };
 
         // Measure stack size (last was 17772)
-        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_rtk_server_connection loop, uxHighWaterMark: "));
-        // DEBUG_SERIAL.println(uxHighWaterMark);
+        uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        DEBUG_SERIAL.print(F("task_rtk_server_connection loop, uxHighWaterMark: "));
+        DEBUG_SERIAL.println(uxHighWaterMark);
         vTaskDelay(RTK_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
     }
     // Delete self task
@@ -858,7 +879,9 @@ bool saveLocation() {
     csvStr = "";
     csvStr = String(msl) + SEP + String(mslHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
-
+    if (success) {
+      setLocationMethodCoords();
+    }
     return success;
 }
 
