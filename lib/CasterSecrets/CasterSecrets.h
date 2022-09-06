@@ -45,7 +45,7 @@ WGS84_XYZ (geocentric)  ECEF-Z 5043750.593 or 5043752.317
 
 after running look here: http://new.rtk2go.com:2101/SNIP::STATUS
 */
-
+/*
 const int32_t ECEF_X_CM = 378252188;   // Earth-centered-X in cm
 const int8_t ECEF_X_HP = 02;           // Earth-centered-X, high precision extension 0.1mm
 const int32_t ECEF_Y_CM = 87338647;    // Earth-centered-Y in cm
@@ -59,16 +59,19 @@ const int32_t LONGITUDE = 130017615;   // 7-digits
 const int8_t LONGITUDE_HP = 00;        // high precision extension
 const int32_t ALTITUDE = 41500;        // Unit: mm
 const int8_t ALTITUDE_HP = 0;          // high precision extension
-
+*/
 
 const float DESIRED_ACCURACY_M = 0.06;
 //RTK2Go MountPoint 1 http://new.rtk2go.com:2101/SNIP::STATUS
 // Email: mr.markuese@gmail.com
 const char CASTER_HOST[] = "rtk2go.com";
 const uint16_t CASTER_PORT = 2101;
-const char MOUNT_POUNT[] = "headtracker2punkt0"; //The mount point you want to push data to
-// const char mountPointPW[] = "WEEK2208";
-const char mountPointPW[] = "h34dtR4ck3R";
+// const char MOUNT_POUNT[] = "headtracker2punkt0"; //The mount point you want to push data to
+// const char mountPointPW[] = "h34dtR4ck3R";
+const char MOUNT_POUNT[] = "rtkbrieselang";
+// const char mountPointPW[] = "RtkbR1353l4ng";
+const char mountPointPW[] = "WEEK2208"; // Interim passward, till rtk2go registration answer comes
+
 const int CONNECTION_TIMEOUT_MS = 10000; // Shorter timeouts lead to complaining email and ban
 
 //RTK2Go MountPoint 2 http://new.rtk2go.com:2101/SNIP::STATUS

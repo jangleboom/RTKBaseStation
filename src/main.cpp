@@ -6,7 +6,7 @@
  * @brief   This is part of a distributed software, here: 
  *          Real Time Kinematics (RTK) base station.
  *          The ESP32 is acting as a 'server' to a 'caster'. In this case we will 
- *          use RTK2Go.com (or Emlid, look at secrets.h) as caster because it is free. 
+ *          use RTK2Go.com (or Emlid, look at CasterSecrets.h) as caster because it is free. 
  *          A rover can then connect to RTK2Go (or Emlid) as a 'client' and get the RTCM 
  *          data it needs. You will need to register your mountpoint here: 
  *          http://www.rtk2go.com/new-reservation/ 
@@ -50,7 +50,7 @@
 #include <Arduino.h>
 #include <Wire.h> // Display and uBlox GNSS
 #include <RTKBaseConfig.h>
-#include <RTKSecrets.h> // You need to create your own header file, like discribed in README.md
+#include <CasterSecrets.h> // You need to create your own header file, like discribed in README.md
 
 /*******************************************************************************
  *                                 Display
@@ -119,14 +119,11 @@ float getDesiredSurveyAccuracy(const char* path);
 void runSurvey(float desiredAccuracyInM, bool resp);
 double getLongitudeHp(void);
 double getLatitudeHp(void);
-// double getHeightOverSeaLevelHp(void);
 float getHeightOverSeaLevel(void);
 float getAccuracy(void);
 bool saveLocation(void);
 void printHighPrecisionPositionAndAccuracy(void);
 void task_rtk_server_connection(void *pvParameters);
-// void task_check_wifi_connection(void *pvParameters);
-// static SemaphoreHandle_t bin_sem_check_wifi = NULL; 
 // Help funcs
 String secondsToTimeFormat(uint32_t sec);
 
@@ -173,13 +170,6 @@ void setup() {
    delay(500);
  }
   startServer(&server);
-         
-  // bin_sem_check_wifi = xSemaphoreCreateBinary();
-   // Force reboot if we can't create the semaphore
-  // if (bin_sem_check_wifi == NULL) {
-  //   DEBUG_SERIAL.println("Could not create semaphore(s)");
-  //   ESP.restart();
-  // }
 
   xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   // xTaskCreatePinnedToCore( &task_check_wifi_connection, "task_check_wifi_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
@@ -605,6 +595,9 @@ void task_rtk_server_connection(void *pvParameters) {
         //Report some statistics every 10000
         if (millis() - lastReport_ms > 10000) {
           lastReport_ms += 10000;
+          while (!checkConnectionToWifiStation()) {
+            delay(1000);
+          }
           DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
           printHighPrecisionPositionAndAccuracy();
 
@@ -614,14 +607,14 @@ void task_rtk_server_connection(void *pvParameters) {
           float accuracy = getAccuracy();
           static float lastAccuracy = 100.0;
           DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
-          DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
+          DEBUG_SERIAL.print("accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
           
-
+          // Update saved location if accuracy gets better
           if (lastAccuracy > accuracy) {
             if (saveLocation()) {
               DEBUG_SERIAL.println(F("Location updated, saved to file."));
+              setLocationMethodCoords();
               lastAccuracy = accuracy;
-              
             } else {
               DEBUG_SERIAL.println(F("Error saving location"));
             }
@@ -660,21 +653,19 @@ void task_rtk_server_connection(void *pvParameters) {
             display.print(F("hAcc: "));
             display.print(accuracy, 4);
             display.print(F(" m   "));
+            
             if (displayRefereshCnt == 0) display.print(F(">"));
             if (displayRefereshCnt == 1) display.print(F("->"));
             if (displayRefereshCnt == 2) display.print(F("-->"));
             if (displayRefereshCnt == 3) display.print(F("--->"));
             display.display();
-          }
+            }
           }
         } // End while (ntripCaster.connected() == true)
 
-        // If connection lost, first check WiFi
-        if (checkConnectionToWifiStation()) {
-          DEBUG_SERIAL.println(F("WiFi connection established"));
-        } else {
-          DEBUG_SERIAL.println(F("Error connecting to WiFi station"));
-        };
+        // If connection lost, first check WiFi - look at serial print out
+        checkConnectionToWifiStation();
+
 
         // Measure stack size (last was 17772)
         uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -841,9 +832,7 @@ bool saveLocation() {
     csvStr = "";
     csvStr = String(msl) + SEP + String(mslHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
-    if (success) {
-      setLocationMethodCoords();
-    }
+
     return success;
 }
 
@@ -884,18 +873,6 @@ float getAccuracy() {
 
   return f_accuracy;
 }
-
-// double getHeightOverSeaLevelHp() {
-//   int32_t msl = myGNSS.getMeanSeaLevel();
-//   int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-//   double d_mslHp; // mean height over sea level
-//   d_mslHp = ((double)msl) / 10000000.0; 
-//   d_mslHp += ((double)mslHp) / 1000000000.0;
-//   DEBUG_SERIAL.print("Height over sea in m: ");
-//   DEBUG_SERIAL.println(d_mslHp, 9);
-
-//   return d_mslHp;
-// }
 
 float getHeightOverSeaLevel() {
   float f_msl;
