@@ -229,39 +229,41 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
       }; //Freeze
     }
 
-    if (myGNSS.getSurveyInActive() == true) // Use the helper function
-    {
-      const String status = "Survey already going";
-      float meanAccuracy = myGNSS.getSurveyInMeanAccuracy();
-      DEBUG_SERIAL.println(status);
-      if (displayConnected) {
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.print(F("SSID: "));
-        display.print(WiFi.SSID());
-        display.setCursor(0, 10);
-        display.print(F("IP: "));
-        display.print(WiFi.localIP());
-        display.setCursor(0, 20);
-        display.print(F("http://")); display.print(DEVICE_NAME); display.print(F(".local"));
-        display.setCursor(0, 30);
-        display.print(status);
-        display.setCursor(0, 40);
-        display.print(F("current Acc.: "));
-        display.print(String(meanAccuracy).c_str()); // Call the helper function
-        display.print(F(" m"));
-        display.setCursor(0, 50);
-        display.print(F("target Acc.: "));
-        display.print(String(desiredAccuracyInM).c_str()); // Call the helper function
-        display.print(F(" m"));
-        display.display();
-      }
+    // if (myGNSS.getSurveyInActive() == true) // Use the helper function
+    while (myGNSS.getSurveyInActive() == true) 
+    { myGNSS.disableSurveyMode();
+      delay(500);
+      // const String status = "Survey already going";
+      // float meanAccuracy = myGNSS.getSurveyInMeanAccuracy();
+      // DEBUG_SERIAL.println(status);
+      // if (displayConnected) {
+      //   display.clearDisplay();
+      //   display.setCursor(0, 0);
+      //   display.print(F("SSID: "));
+      //   display.print(WiFi.SSID());
+      //   display.setCursor(0, 10);
+      //   display.print(F("IP: "));
+      //   display.print(WiFi.localIP());
+      //   display.setCursor(0, 20);
+      //   display.print(F("http://")); display.print(DEVICE_NAME); display.print(F(".local"));
+      //   display.setCursor(0, 30);
+      //   display.print(status);
+      //   display.setCursor(0, 40);
+      //   display.print(F("current Acc.: "));
+      //   display.print(String(meanAccuracy).c_str()); // Call the helper function
+      //   display.print(F(" m"));
+      //   display.setCursor(0, 50);
+      //   display.print(F("target Acc.: "));
+      //   display.print(String(desiredAccuracyInM).c_str()); // Call the helper function
+      //   display.print(F(" m"));
+      //   display.display();
+      // }
     }
-    else
-    {
+    // else
+    // {
       //Start survey
       // response = myGNSS.enableSurveyModeFull(60, 1.0); //Enable Survey in, 60 seconds, 1.0m
-      response = myGNSS.enableSurveyMode(60, desiredAccuracyInM); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
+      response = myGNSS.enableSurveyModeFull(60, desiredAccuracyInM); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
       if (response == false)
       {
         const String status = "Survey start failed.";
@@ -284,7 +286,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     DEBUG_SERIAL.print(F("Survey started. This will run until 60s has passed and less than "));
     DEBUG_SERIAL.print(desiredAccuracyInM);
     DEBUG_SERIAL.println(F(" mm accuracy is achieved."));
-    }
+    // }
 
     //Begin waiting for survey to complete
     while (myGNSS.getSurveyInValid() == false) // Call the helper function
@@ -366,13 +368,7 @@ void setupRTKBase(bool surveyEnabled) {
         delay(1000);
         }
   }
-  // myGNSS.softwareResetGNSSOnly(); DEBUG_SERIAL.println(F("myGNSS softwareResetGNSSOnly"));  // Controlled Software Reset (GNSS only) only restarts the GNSS tasks, without reinitializing the full system or reloading any stored configuration.
-  // myGNSS.hardReset(); DEBUG_SERIAL.println(F("myGNSS hard reset"));                      // Perform a reset leading to a cold start (zero info start-up)
-  // myGNSS.factoryDefault(); DEBUG_SERIAL.println(F("myGNSS factoryDefault"));             // Reset module to factory defaults
-  // myGNSS.factoryReset(); DEBUG_SERIAL.println(F("myGNSS factoryReset()"));            // Send factory reset sequence (i.e. load "default" configuration and perform hardReset)
-  // delay(1000);
 
-  
   myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_RTCM3 | COM_TYPE_NMEA);  //UBX+RTCM3 is not a valid option so we enable all three.
   // myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save the communications port settings to flash and BBR
   myGNSS.setNavigationFrequency(1);  //Set output in Hz. RTCM rarely benefits from >1Hz.
@@ -703,10 +699,10 @@ void task_rtk_server_connection(void *pvParameters) {
             display.print(F("hAcc: "));
             display.print(accuracy, 4);
             display.print(F(" m   "));
-            if (displayRefereshCnt == 0) display.print(F("|"));
-            if (displayRefereshCnt == 1) display.print(F("||"));
-            if (displayRefereshCnt == 2) display.print(F("|||"));
-            if (displayRefereshCnt == 3) display.print(F("||||"));
+            if (displayRefereshCnt == 0) display.print(F(">"));
+            if (displayRefereshCnt == 1) display.print(F("->"));
+            if (displayRefereshCnt == 2) display.print(F("-->"));
+            if (displayRefereshCnt == 3) display.print(F("--->"));
             display.display();
           }
           }
