@@ -397,15 +397,16 @@ void setupRTKBase(bool surveyEnabled) {
     }
 
   } else {
+    // Read safed target accuracy from SPIFFS
     float desiredAcc = getDesiredSurveyAccuracy(PATH_RTK_LOCATION_SURVEY_ACCURACY);
+    // Start survey-in
     runSurvey(desiredAcc, response);
   }
   
   DEBUG_SERIAL.println(F("Module failed to save"));
 
 /* 
-  ECEF coordinates: Example tiny office Brieslang
-  after running look here: http://new.rtk2go.com:2101/SNIP::STATUS
+  after running look here for your mountpoint: http://new.rtk2go.com:2101/SNIP::STATUS
 */
 
   DEBUG_SERIAL.println(F("Module configuration complete"));
@@ -426,26 +427,11 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
  *                                 WiFi
  * ****************************************************************************/
 
-// void task_check_wifi_connection(void *pvParameters) {
-//     (void)pvParameters;
-//     bool wifiConnected;
-//     while (true) {
-//       wifiConnected = checkConnectionToWifiStation();
-//       wifiConnected ? (xSemaphoreGive(bin_sem_check_wifi) : (xSemaphoreTake(bin_sem_check_wifi)))
-//       vTaskDelay(CHECK_WIFI_INTERVAL_MS/portTICK_PERIOD_MS);
-//     }
-//     // Delete self task
-//     vTaskDelete(NULL);
-// }
-
 void task_rtk_server_connection(void *pvParameters) {
     (void)pvParameters;
     Wire.setClock(I2C_FREQUENCY_100K);
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
-    // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DEBUG_SERIAL.print(F("task_rtk_server_connection setup, uxHighWaterMark: "));
-    // DEBUG_SERIAL.println(uxHighWaterMark);
 
     bool connectionSuccess = false;
     char response[512];
@@ -466,6 +452,7 @@ void task_rtk_server_connection(void *pvParameters) {
     
     while (!credentialsExists) {
       DEBUG_SERIAL.println("RTK Credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
+      
       if (displayConnected) {
         display.clearDisplay();
         display.setCursor(0,0);
@@ -486,29 +473,29 @@ void task_rtk_server_connection(void *pvParameters) {
         display.display();
       }
       
-      
       vTaskDelay(1000);
-      //TODO: display status
     }
 
     String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
     String latitude = readFile(SPIFFS, PATH_RTK_LOCATION_LATITUDE);
     String longitude = readFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE);
     String altitude = readFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE);
+
     bool surveyEnabled = true;
     surveyEnabled &=  locationMethod.isEmpty() || \
-                      locationMethod.equals("survey_enabled");   
-                      // latitude.isEmpty() || \
-                      // longitude.isEmpty() || \
-                      // altitude.isEmpty();
+                      locationMethod.equals("survey_enabled") || \
+                      latitude.isEmpty() || \
+                      longitude.isEmpty() || \
+                      altitude.isEmpty();
     DEBUG_SERIAL.printf("task_rtk_server_connection, surveyEnabled: %s\n", surveyEnabled ? "yes" : "no");
     setupRTKBase(surveyEnabled);
 
     while (true) {
-      // beginServing() func content
-      // Connect if we are not already
+      // beginServing() func content from Sparkfun example ZED-F9P/Example4_BaseWithLCD
+      
       taskStart:
 
+      // Connect if we are not already
       if (ntripCaster.connected() == false) {
           DEBUG_SERIAL.printf("Opening socket to %s\n", CASTER_HOST);
 
@@ -600,15 +587,17 @@ void task_rtk_server_connection(void *pvParameters) {
                 if (displayConnected) {
                   display.clearDisplay();
                   display.setCursor(0,0);
-                  display.print("ERROR, hang up!");
+                  display.print("Timeout ERROR!");
+                  display.setCursor(0,10);
                   display.print(DEVICE_NAME);
+                  display.print(", hang up!");
                   display.setCursor(0,20);
                   display.print("ntripCaster stopped");
                   display.setCursor(0,30);
                   display.print(status);
                   display.display();
                 }
-                goto taskStart;// return;
+                goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
         }
 
         delay(10);
@@ -630,7 +619,7 @@ void task_rtk_server_connection(void *pvParameters) {
 
           if (lastAccuracy > accuracy) {
             if (saveLocation()) {
-              DEBUG_SERIAL.println(F("Location updated"));
+              DEBUG_SERIAL.println(F("Location updated, saved to file."));
               lastAccuracy = accuracy;
               
             } else {
@@ -731,14 +720,19 @@ bool setupDisplay() {
 
     // Clear the buffer.
     display.clearDisplay();
-    display.setTextSize(1);
+    display.setTextSize(2);
     //display.drawLine(0, 0, display.width() - 1, 0, SH110X_WHITE);
     display.setTextColor(SH110X_WHITE, SH110X_BLACK);
-    DEBUG_SERIAL.println(F("Display setup done"));
     display.setCursor(0,0);
-    display.print(F("Hello from "));
+    display.print(F("Hello"));
+    display.setCursor(0,20);
+    display.print(F("from"));
+    display.setCursor(0,40);
     display.print(DEVICE_NAME);
     display.display();
+    display.setTextSize(1);
+    
+    DEBUG_SERIAL.println(F("Display setup done"));
   }
 
   return displayConnected;
