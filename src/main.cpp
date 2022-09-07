@@ -117,9 +117,8 @@ SFE_UBLOX_GNSS myGNSS;
 void setupRTKBase(bool surveyEnabled);
 float getDesiredSurveyAccuracy(const char* path);
 void runSurvey(float desiredAccuracyInM, bool resp);
-double getLongitudeHp(void);
-double getLatitudeHp(void);
-// double getHeightOverSeaLevelHp(void);
+double getLongitude(void);
+double getLatitude(void);
 float getHeightOverSeaLevel(void);
 float getAccuracy(void);
 bool saveLocation(void);
@@ -383,7 +382,7 @@ void setupRTKBase(bool surveyEnabled) {
     // Latitude, Longitude, Altitude input:
     location_int_t baseLoc;
     getIntLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
-    response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, baseLoc.alt_hp, true); 
+    response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, int32_t(baseLoc.ellips/10.0), (baseLoc.ellips%10), true); 
     response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
     // Or use Earth-centered coordinates:
     //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
@@ -403,8 +402,6 @@ void setupRTKBase(bool surveyEnabled) {
     runSurvey(desiredAcc, response);
   }
   
-  DEBUG_SERIAL.println(F("Module failed to save"));
-
 /* 
   after running look here for your mountpoint: http://new.rtk2go.com:2101/SNIP::STATUS
 */
@@ -608,9 +605,10 @@ void task_rtk_server_connection(void *pvParameters) {
           DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
           printHighPrecisionPositionAndAccuracy();
 
-          double latitudeHp = getLatitudeHp();
-          double longitudeHp = getLongitudeHp();
-          float altitude = getHeightOverSeaLevel();
+          double lat = getLatitude();
+          double lon = getLongitude();
+          int32_t alt = myGNSS.getAltitude();//getHeightOverSeaLevel();
+          DEBUG_SERIAL.print("elipsoidal Altitude: "); DEBUG_SERIAL.println(alt);
           float accuracy = getAccuracy();
           static float lastAccuracy = 100.0;
           DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
@@ -643,17 +641,17 @@ void task_rtk_server_connection(void *pvParameters) {
 
             display.setCursor(0, 20);
             display.print(F("Lat: "));
-            display.print(latitudeHp, 9);
+            display.print(lat, 9);
             display.print(F(" deg"));
 
             display.setCursor(0, 30);
             display.print("Lon: ");
-            display.print(longitudeHp, 9);
+            display.print(lon, 9);
             display.print(F(" deg"));
 
             display.setCursor(0, 40);
-            display.print("Alt: ");
-            display.print(altitude, 4);
+            display.print("Elipsoid: ");
+            display.print(alt/1000.0, 4);
             display.print(F(" m"));
 
             display.setCursor(0, 50);
@@ -724,10 +722,11 @@ bool setupDisplay() {
     //display.drawLine(0, 0, display.width() - 1, 0, SH110X_WHITE);
     display.setTextColor(SH110X_WHITE, SH110X_BLACK);
     display.setCursor(0,0);
-    display.print(F("Hello"));
+    display.print(F("  Hello"));
     display.setCursor(0,20);
-    display.print(F("from"));
+    display.print(F("   from"));
     display.setCursor(0,40);
+    display.print(F("  "));
     display.print(DEVICE_NAME);
     display.display();
     display.setTextSize(1);
@@ -825,12 +824,12 @@ bool saveLocation() {
     int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
     int32_t longitude = myGNSS.getHighResLongitude();
     int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
-    // int32_t ellipsoid = myGNSS.getElipsoid();
-    // int8_t ellipsoidHp = myGNSS.getElipsoidHp();
-    int32_t msl = myGNSS.getMeanSeaLevel();
-    int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-    DEBUG_SERIAL.print("saveLocation: msl: ");DEBUG_SERIAL.print(msl);
-    DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
+    int32_t ellipsoid = myGNSS.getElipsoid();
+    int8_t ellipsoidHp = myGNSS.getElipsoidHp();
+    // int32_t msl = myGNSS.getMeanSeaLevel();
+    // int8_t mslHp = myGNSS.getMeanSeaLevelHp();
+    // DEBUG_SERIAL.print("saveLocation: msl: ");DEBUG_SERIAL.print(msl);
+    // DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
     // uint32_t accuracy = myGNSS.getHorizontalAccuracy();
     bool success = true;
     String csvStr = String(latitude) + SEP + String(latitudeHp);
@@ -839,7 +838,9 @@ bool saveLocation() {
     csvStr = String(longitude) + SEP + String(longitudeHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE, csvStr.c_str());
     csvStr = "";
-    csvStr = String(msl) + SEP + String(mslHp);
+    // csvStr = String(msl) + SEP + String(mslHp);
+    // success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
+    csvStr = String(ellipsoid) + SEP + String(ellipsoidHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
     if (success) {
       setLocationMethodCoords();
@@ -847,7 +848,7 @@ bool saveLocation() {
     return success;
 }
 
-double getLatitudeHp() {
+double getLatitude() {
   int32_t latitude = myGNSS.getHighResLatitude();
   int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
   double d_lat; // latitude
@@ -860,7 +861,7 @@ double getLatitudeHp() {
   return d_lat;
 }
 
-double getLongitudeHp() {
+double getLongitude() {
   int32_t longitude = myGNSS.getHighResLongitude();
   int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
   double d_lon; // longitude
@@ -885,18 +886,6 @@ float getAccuracy() {
   return f_accuracy;
 }
 
-// double getHeightOverSeaLevelHp() {
-//   int32_t msl = myGNSS.getMeanSeaLevel();
-//   int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-//   double d_mslHp; // mean height over sea level
-//   d_mslHp = ((double)msl) / 10000000.0; 
-//   d_mslHp += ((double)mslHp) / 1000000000.0;
-//   DEBUG_SERIAL.print("Height over sea in m: ");
-//   DEBUG_SERIAL.println(d_mslHp, 9);
-
-//   return d_mslHp;
-// }
-
 float getHeightOverSeaLevel() {
   float f_msl;
   int32_t msl = myGNSS.getMeanSeaLevel();
@@ -906,9 +895,11 @@ float getHeightOverSeaLevel() {
   // Now convert to m
   f_msl = f_msl / 10000.0; // Convert from mm * 10^-1 to m
   DEBUG_SERIAL.print("Alt.: ");
-  DEBUG_SERIAL.println(f_msl, 4); // Print the mean sea level with 4 decimal places
+  DEBUG_SERIAL.println(f_msl); // Print the mean sea level with 4 decimal places
 
   return f_msl;
 }
+
+
 
 
