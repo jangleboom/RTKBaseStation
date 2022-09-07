@@ -503,8 +503,9 @@ void task_rtk_server_connection(void *pvParameters) {
 
         if (ntripCaster.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == true)  //Attempt connection
         {
-            DEBUG_SERIAL.print(F("Connected to %s:%d\n"));
+            DEBUG_SERIAL.print(F("Connected to "));
             DEBUG_SERIAL.print(casterHost.c_str());
+            DEBUG_SERIAL.print(F(":"));
             DEBUG_SERIAL.println((uint16_t)casterPort.toInt());
 
             const int SERVER_BUFFER_SIZE = 512;
@@ -515,7 +516,7 @@ void task_rtk_server_connection(void *pvParameters) {
                     "SOURCE %s /%s\r\nSource-Agent: NTRIP SparkFun u-blox Server v1.0\r\n\r\n",
                     mountPointPW.c_str(), mountPoint.c_str());
 
-            DEBUG_SERIAL.println(F("Sending server request:"));
+            DEBUG_SERIAL.print(F("Sending server request: "));
             DEBUG_SERIAL.println(serverRequest);
             ntripCaster.write(serverRequest, strlen(serverRequest));
 
@@ -543,9 +544,8 @@ void task_rtk_server_connection(void *pvParameters) {
             if (connectionSuccess == false) {
                 DEBUG_SERIAL.print(F("Failed to connect to Caster: ")); 
                 DEBUG_SERIAL.println(response);
-                if (String(response).equals("ICY 401 Unauthorized")) {
-                  DEBUG_SERIAL.println("You are banned from rtk2go.com!");
-
+                // "ICY 401 Unauthorized" means banned
+                if (strstr(response, "401") > 0) {
                   if (displayConnected) {
                     display.clearDisplay();
                     display.setCursor(0,0);
@@ -559,9 +559,9 @@ void task_rtk_server_connection(void *pvParameters) {
                     display.setCursor(0,40);
                     display.print("Client settings!");
                   }
+                  while (true) {};
                 }
-
-                vTaskDelay(1000);
+                vTaskDelay(5000);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             }  // End attempt to connect
@@ -621,7 +621,7 @@ void task_rtk_server_connection(void *pvParameters) {
           double latitude  = getLatitudeDegree(lat, latHp);
           double longitude = getLongitudeDegree(lon, lonHp);
           // float f_msl = getHeightOverSeaLevel(myGNSS.getAltitudeMSL);
-          double altitude = myGNSS.getAltitude()/1000.0; // mm to m
+          double altitude = myGNSS.getAltitudeMSL()/1000.0; // mm to m
           float accuracy  = getAccuracy();
           static float lastAccuracy = 100.0;
           DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);

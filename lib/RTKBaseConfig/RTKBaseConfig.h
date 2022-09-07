@@ -10,7 +10,7 @@
 //                       Default Serial settings
 /******************************************************************************/
 //set to true for debug output, false for no debug output
-#define DEBUGGING false
+#define DEBUGGING true
 #define DEBUG_SERIAL \
   if (DEBUGGING) Serial
 
