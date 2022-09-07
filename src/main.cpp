@@ -117,11 +117,11 @@ SFE_UBLOX_GNSS myGNSS;
 void setupRTKBase(bool surveyEnabled);
 float getDesiredSurveyAccuracy(const char* path);
 void runSurvey(float desiredAccuracyInM, bool resp);
-double getLongitudeHp(void);
-double getLatitudeHp(void);
-float getHeightOverSeaLevel(void);
+double getLongitudeDegree(int32_t lon, int8_t lonHp);
+double getLatitudeDegree(int32_t lat, int8_t latHp);
+float getHeightOverSeaLevel(int32_t msl, int8_t mslHp);
 float getAccuracy(void);
-bool saveLocation(void);
+bool saveLocation(int32_t lat, int8_t latHp, int32_t lon, int8_t lonHp, int32_t alt);
 void printHighPrecisionPositionAndAccuracy(void);
 void task_rtk_server_connection(void *pvParameters);
 // Help funcs
@@ -267,12 +267,6 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
         DEBUG_SERIAL.print(F(" Accuracy: "));
         DEBUG_SERIAL.println(meanAccuracy); // Call the helper function
 
-        if (checkConnectionToWifiStation()) {
-          DEBUG_SERIAL.println(F("WiFi connection established"));
-        } else {
-          DEBUG_SERIAL.println(F("Error connecting to WiFi station"));
-        };
-
         if (displayConnected) {
           display.clearDisplay();
           display.setCursor(0, 0);
@@ -372,7 +366,7 @@ void setupRTKBase(bool surveyEnabled) {
     // Latitude, Longitude, Altitude input:
     location_int_t baseLoc;
     getIntLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
-    response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, baseLoc.alt_hp, true); 
+    response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, 0, true); 
     response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
     // Or use Earth-centered coordinates:
     //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
@@ -413,6 +407,25 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
 /*******************************************************************************
  *                                 WiFi
  * ****************************************************************************/
+void task_check_wifi_connection(void *pvParameters) {
+  (void)pvParameters;
+  // Measure stack size
+  UBaseType_t uxHighWaterMark; 
+  
+  while (true) {
+    checkConnectionToWifiStation();
+    // Measure stack size (last was ?)
+    uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+    DEBUG_SERIAL.print(F("task_check_wifi_connection loop, uxHighWaterMark: "));
+    DEBUG_SERIAL.println(uxHighWaterMark);
+
+    vTaskDelay(30000/portTICK_PERIOD_MS);
+  }
+
+  // Delete self task
+  ntripCaster.stop();
+  vTaskDelete(NULL);
+}
 
 void task_rtk_server_connection(void *pvParameters) {
     (void)pvParameters;
@@ -547,15 +560,15 @@ void task_rtk_server_connection(void *pvParameters) {
                     display.print("Client settings!");
                   }
                 }
-                checkConnectionToWifiStation();
+
                 vTaskDelay(1000);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             }  // End attempt to connect
             else {
                 DEBUG_SERIAL.println(F("Connection to host failed"));
-                checkConnectionToWifiStation();
                 vTaskDelay(1000);
+
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
             }
         }  // End connected == false
@@ -600,19 +613,24 @@ void task_rtk_server_connection(void *pvParameters) {
             delay(1000);
           }
           DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
-          printHighPrecisionPositionAndAccuracy();
-
-          double latitudeHp = getLatitudeHp();
-          double longitudeHp = getLongitudeHp();
-          float altitude = getHeightOverSeaLevel();
-          float accuracy = getAccuracy();
+          // printHighPrecisionPositionAndAccuracy();
+          int32_t lat  = myGNSS.getHighResLatitude();
+          int8_t latHp = myGNSS.getHighResLatitudeHp();
+          int32_t lon  = myGNSS.getHighResLongitude();
+          int8_t lonHp = myGNSS.getHighResLongitudeHp();
+          double latitude  = getLatitudeDegree(lat, latHp);
+          double longitude = getLongitudeDegree(lon, lonHp);
+          // float f_msl = getHeightOverSeaLevel(myGNSS.getAltitudeMSL);
+          double altitude = myGNSS.getAltitude()/1000.0; // mm to m
+          float accuracy  = getAccuracy();
           static float lastAccuracy = 100.0;
           DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
           DEBUG_SERIAL.print("accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
+          DEBUG_SERIAL.print("altitude: "); DEBUG_SERIAL.println(altitude);
           
           // Update saved location if accuracy gets better
           if (lastAccuracy > accuracy) {
-            if (saveLocation()) {
+            if (saveLocation(lat, latHp, lon, lonHp, altitude)) {
               DEBUG_SERIAL.println(F("Location updated, saved to file."));
               setLocationMethodCoords();
               lastAccuracy = accuracy;
@@ -637,12 +655,12 @@ void task_rtk_server_connection(void *pvParameters) {
 
             display.setCursor(0, 20);
             display.print(F("Lat: "));
-            display.print(latitudeHp, 9);
+            display.print(latitude, 9);
             display.print(F(" deg"));
 
             display.setCursor(0, 30);
             display.print("Lon: ");
-            display.print(longitudeHp, 9);
+            display.print(longitude, 9);
             display.print(F(" deg"));
 
             display.setCursor(0, 40);
@@ -664,15 +682,11 @@ void task_rtk_server_connection(void *pvParameters) {
           }
         } // End while (ntripCaster.connected() == true)
 
-        // If connection lost, first check WiFi - look at serial print out
-        checkConnectionToWifiStation();
-
-
         // Measure stack size (last was 17772)
         uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         DEBUG_SERIAL.print(F("task_rtk_server_connection loop, uxHighWaterMark: "));
         DEBUG_SERIAL.println(uxHighWaterMark);
-        vTaskDelay(RTK_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
+        vTaskDelay(TASK_RTK_SERVER_INTERVAL_MS/portTICK_PERIOD_MS);
     }
     // Delete self task
     ntripCaster.stop();
@@ -716,10 +730,11 @@ bool setupDisplay() {
     //display.drawLine(0, 0, display.width() - 1, 0, SH110X_WHITE);
     display.setTextColor(SH110X_WHITE, SH110X_BLACK);
     display.setCursor(0,0);
-    display.print(F("Hello"));
+    display.print(F("   Hello"));
     display.setCursor(0,20);
-    display.print(F("from"));
+    display.print(F("   from"));
     display.setCursor(0,40);
+    display.print(F("  "));
     display.print(DEVICE_NAME);
     display.display();
     display.setTextSize(1);
@@ -743,6 +758,23 @@ String secondsToTimeFormat(uint32_t sec) {  //Time we are converting. This can b
   return hhMmmSs;
 }
 
+// Pretty-print the fractional part with leading zeros - without using printf
+// (Only works with positive numbers)
+void printFractional(int32_t fractional, uint8_t places)
+{
+  if (places > 1)
+  {
+    for (uint8_t place = places - 1; place > 0; place--)
+    {
+      if (fractional < pow(10, place))
+      {
+        Serial.print("0");
+      }
+    }
+  }
+  Serial.print(fractional);
+}
+
 void printHighPrecisionPositionAndAccuracy() {
     // getHighResLatitude: returns the latitude from HPPOSLLH as an int32_t in degrees * 10^-7
     // getHighResLatitudeHp: returns the high resolution component of latitude from HPPOSLLH as an int8_t in degrees * 10^-9
@@ -754,7 +786,63 @@ void printHighPrecisionPositionAndAccuracy() {
     // getMeanSeaLevelHp: returns the high resolution component of the height above mean sea level as an int8_t in mm * 10^-1
     // getHorizontalAccuracy: returns the horizontal accuracy estimate from HPPOSLLH as an uint32_t in mm * 10^-1
 
-    // First, let's collect the position data
+  //   // First, let's collect the position data
+  //   int32_t latitude = myGNSS.getHighResLatitude();
+  //   int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
+  //   int32_t longitude = myGNSS.getHighResLongitude();
+  //   int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
+  //   int32_t ellipsoid = myGNSS.getElipsoid();
+  //   int8_t ellipsoidHp = myGNSS.getElipsoidHp();
+  //   int32_t msl = myGNSS.getMeanSeaLevel();
+  //   int8_t mslHp = myGNSS.getMeanSeaLevelHp();
+  //   uint32_t accuracy = myGNSS.getHorizontalAccuracy();
+
+  //   // Defines storage for the lat and lon as double
+  //   double d_lat; // latitude
+  //   double d_lon; // longitude
+
+  //   // Assemble the high precision latitude and longitude
+  //   d_lat = ((double)latitude) / 10000000.0;        // Convert latitude from degrees * 10^-7 to degrees
+  //   d_lat += ((double)latitudeHp) / 1000000000.0;   // Now add the high resolution component (degrees * 10^-9 )
+  //   d_lon = ((double)longitude) / 10000000.0;       // Convert longitude from degrees * 10^-7 to degrees
+  //   d_lon += ((double)longitudeHp) / 1000000000.0;  // Now add the high resolution component (degrees * 10^-9 )
+
+  //  // Print the lat and lon
+  //   DEBUG_SERIAL.print("Lat (deg): ");
+  //   DEBUG_SERIAL.print(d_lat, 9);
+  //   DEBUG_SERIAL.print(", Lon (deg): ");
+  //   DEBUG_SERIAL.println(d_lon, 9);
+
+  //   // Now define float storage for the heights and accuracy
+  //   float f_ellipsoid;
+  //   float f_msl;
+  //   float f_accuracy;
+
+  //   // Calculate the height above ellipsoid in mm * 10^-1
+  //   f_ellipsoid = (ellipsoid * 10) + ellipsoidHp;
+  //   // Now convert to m
+  //   f_ellipsoid = f_ellipsoid / 10000.0; // Convert from mm * 10^-1 to m
+
+  //   // Calculate the height above mean sea level in mm * 10^-1
+  //   f_msl = (msl * 10) + mslHp;
+  //   // Now convert to m
+  //   f_msl = f_msl / 10000.0; // Convert from mm * 10^-1 to m
+
+  //   // Convert the horizontal accuracy (mm * 10^-1) to a float
+  //   f_accuracy = accuracy;
+  //   // Now convert to m
+  //   f_accuracy = f_accuracy / 10000.0; // Convert from mm * 10^-1 to m
+
+  //   // Finally, do the printing
+  //   DEBUG_SERIAL.print(", Ellipsoid (m): ");
+  //   DEBUG_SERIAL.print(f_ellipsoid, 4); // Print the ellipsoid with 4 decimal places
+
+  //   DEBUG_SERIAL.print(", Mean Sea Level (m): ");
+  //   DEBUG_SERIAL.print(f_msl, 4); // Print the mean sea level with 4 decimal places
+
+  //   DEBUG_SERIAL.print(", Accuracy (m): ");
+  //   DEBUG_SERIAL.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
+  // First, let's collect the position data
     int32_t latitude = myGNSS.getHighResLatitude();
     int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
     int32_t longitude = myGNSS.getHighResLongitude();
@@ -765,21 +853,38 @@ void printHighPrecisionPositionAndAccuracy() {
     int8_t mslHp = myGNSS.getMeanSeaLevelHp();
     uint32_t accuracy = myGNSS.getHorizontalAccuracy();
 
-    // Defines storage for the lat and lon as double
-    double d_lat; // latitude
-    double d_lon; // longitude
+    // Defines storage for the lat and lon units integer and fractional parts
+    int32_t lat_int; // Integer part of the latitude in degrees
+    int32_t lat_frac; // Fractional part of the latitude
+    int32_t lon_int; // Integer part of the longitude in degrees
+    int32_t lon_frac; // Fractional part of the longitude
 
-    // Assemble the high precision latitude and longitude
-    d_lat = ((double)latitude) / 10000000.0;        // Convert latitude from degrees * 10^-7 to degrees
-    d_lat += ((double)latitudeHp) / 1000000000.0;   // Now add the high resolution component (degrees * 10^-9 )
-    d_lon = ((double)longitude) / 10000000.0;       // Convert longitude from degrees * 10^-7 to degrees
-    d_lon += ((double)longitudeHp) / 1000000000.0;  // Now add the high resolution component (degrees * 10^-9 )
+    // Calculate the latitude and longitude integer and fractional parts
+    lat_int = latitude / 10000000; // Convert latitude from degrees * 10^-7 to Degrees
+    lat_frac = latitude - (lat_int * 10000000); // Calculate the fractional part of the latitude
+    lat_frac = (lat_frac * 100) + latitudeHp; // Now add the high resolution component
+    if (lat_frac < 0) // If the fractional part is negative, remove the minus sign
+    {
+      lat_frac = 0 - lat_frac;
+    }
+    lon_int = longitude / 10000000; // Convert latitude from degrees * 10^-7 to Degrees
+    lon_frac = longitude - (lon_int * 10000000); // Calculate the fractional part of the longitude
+    lon_frac = (lon_frac * 100) + longitudeHp; // Now add the high resolution component
+    if (lon_frac < 0) // If the fractional part is negative, remove the minus sign
+    {
+      lon_frac = 0 - lon_frac;
+    }
 
-   // Print the lat and lon
-    DEBUG_SERIAL.print("Lat (deg): ");
-    DEBUG_SERIAL.print(d_lat, 9);
-    DEBUG_SERIAL.print(", Lon (deg): ");
-    DEBUG_SERIAL.println(d_lon, 9);
+    // Print the lat and lon
+    Serial.print("Lat (deg): ");
+    Serial.print(lat_int); // Print the integer part of the latitude
+    Serial.print(".");
+    printFractional(lat_frac, 9); // Print the fractional part of the latitude with leading zeros
+    Serial.print(", Lon (deg): ");
+    Serial.print(lon_int); // Print the integer part of the latitude
+    Serial.print(".");
+    printFractional(lon_frac, 9); // Print the fractional part of the latitude with leading zeros
+    Serial.println();
 
     // Now define float storage for the heights and accuracy
     float f_ellipsoid;
@@ -802,47 +907,34 @@ void printHighPrecisionPositionAndAccuracy() {
     f_accuracy = f_accuracy / 10000.0; // Convert from mm * 10^-1 to m
 
     // Finally, do the printing
-    DEBUG_SERIAL.print(", Ellipsoid (m): ");
-    DEBUG_SERIAL.print(f_ellipsoid, 4); // Print the ellipsoid with 4 decimal places
+    Serial.print("Ellipsoid (m): ");
+    Serial.print(f_ellipsoid, 4); // Print the ellipsoid with 4 decimal places
 
-    DEBUG_SERIAL.print(", Mean Sea Level (m): ");
-    DEBUG_SERIAL.print(f_msl, 4); // Print the mean sea level with 4 decimal places
+    Serial.print(", Mean Sea Level(m): ");
+    Serial.print(f_msl, 4); // Print the mean sea level with 4 decimal places
 
-    DEBUG_SERIAL.print(", Accuracy (m): ");
-    DEBUG_SERIAL.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
+    Serial.print(", Accuracy (m): ");
+    Serial.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
 }
 
-bool saveLocation() {
-    int32_t latitude = myGNSS.getHighResLatitude();
-    int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
-    int32_t longitude = myGNSS.getHighResLongitude();
-    int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
-    // int32_t ellipsoid = myGNSS.getElipsoid();
-    // int8_t ellipsoidHp = myGNSS.getElipsoidHp();
-    int32_t msl = myGNSS.getMeanSeaLevel();
-    int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-    DEBUG_SERIAL.print("saveLocation: msl: ");DEBUG_SERIAL.print(msl);
-    DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
-    // uint32_t accuracy = myGNSS.getHorizontalAccuracy();
+bool saveLocation(int32_t lat, int8_t latHp, int32_t lon, int8_t lonHp, int32_t alt) {
     bool success = true;
-    String csvStr = String(latitude) + SEP + String(latitudeHp);
+    String csvStr = String(lat) + SEP + String(latHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LATITUDE, csvStr.c_str());
     csvStr = "";
-    csvStr = String(longitude) + SEP + String(longitudeHp);
+    csvStr = String(lon) + SEP + String(lonHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE, csvStr.c_str());
     csvStr = "";
-    csvStr = String(msl) + SEP + String(mslHp);
+    csvStr = String(alt/1000);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
 
     return success;
 }
 
-double getLatitudeHp() {
-  int32_t latitude = myGNSS.getHighResLatitude();
-  int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
+double getLatitudeDegree(int32_t lat, int8_t latHp) {
   double d_lat; // latitude
-  d_lat = ((double)latitude) / 10000000.0;        // Convert latitude from degrees * 10^-7 to degrees
-  d_lat += ((double)latitudeHp) / 1000000000.0;   // Now add the high resolution component (degrees * 10^-9 )
+  d_lat = ((double)lat) / 10000000.0;        // Convert latitude from degrees * 10^-7 to degrees
+  d_lat += ((double)latHp) / 1000000000.0;   // Now add the high resolution component (degrees * 10^-9 )
 
   DEBUG_SERIAL.print("Lat (deg): ");
   DEBUG_SERIAL.println(d_lat, 9);
@@ -850,12 +942,10 @@ double getLatitudeHp() {
   return d_lat;
 }
 
-double getLongitudeHp() {
-  int32_t longitude = myGNSS.getHighResLongitude();
-  int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
+double getLongitudeDegree(int32_t lon, int8_t lonHp) {
   double d_lon; // longitude
-  d_lon = ((double)longitude) / 10000000.0; 
-  d_lon += ((double)longitudeHp) / 1000000000.0;
+  d_lon = ((double)lon) / 10000000.0; 
+  d_lon += ((double)lonHp) / 1000000000.0;
   DEBUG_SERIAL.print("Lon (deg): ");
   DEBUG_SERIAL.println(d_lon, 9);
 
@@ -875,10 +965,8 @@ float getAccuracy() {
   return f_accuracy;
 }
 
-float getHeightOverSeaLevel() {
+float getHeightOverSeaLevel(int32_t msl, int8_t mslHp) {
   float f_msl;
-  int32_t msl = myGNSS.getMeanSeaLevel();
-  int8_t mslHp = myGNSS.getMeanSeaLevelHp();
   // Calculate the height above mean sea level in mm * 10^-1
   f_msl = (msl * 10) + mslHp;
   // Now convert to m

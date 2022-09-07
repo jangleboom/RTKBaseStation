@@ -61,8 +61,9 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 #define RUNNING_CORE_1                1  // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
-#define GNSS_WIFI_PRIORITY             2  // GNSS/WiFi should have a lower priority
-#define RTK_TASK_INTERVAL_MS          10
+#define GNSS_WIFI_PRIORITY            2  // GNSS/WiFi should have a lower priority
+#define TASK_RTK_SERVER_INTERVAL_MS   10
+#define TASK_CHECK_WIFI_INTERVAL_MS   30000
 
 /*******************************************************************************
  *                         Help Functions
