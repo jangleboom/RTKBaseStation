@@ -608,7 +608,7 @@ void task_rtk_server_connection(void *pvParameters) {
           double lat = getLatitude();
           double lon = getLongitude();
           int32_t alt = myGNSS.getAltitude();//getHeightOverSeaLevel();
-          DEBUG_SERIAL.print("elipsoidal Altitude: "); DEBUG_SERIAL.println(alt);
+          DEBUG_SERIAL.print("ellipsoidal Altitude: "); DEBUG_SERIAL.println(alt);
           float accuracy = getAccuracy();
           static float lastAccuracy = 100.0;
           DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
