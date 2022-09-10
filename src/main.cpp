@@ -122,6 +122,7 @@ double getLatitude(void);
 float getHeightOverSeaLevel(void);
 float getAccuracy(void);
 bool saveCurrentLocation(void);
+bool setStaticLocationFromSPIFFS(void);
 void printLocation(location_int_t *location);
 void printPositionAndAccuracy(void);
 void task_rtk_server_connection(void *pvParameters);
@@ -613,7 +614,7 @@ void task_rtk_server_connection(void *pvParameters) {
           int32_t ellipsoid = myGNSS.getElipsoid();
           int8_t ellipsoidHp = myGNSS.getElipsoidHp();
           float altitude = getFloatAltFromIntegerParts(ellipsoid, ellipsoidHp);
-          DEBUG_SERIAL.print("Ellipsoidal altitude: "); DEBUG_SERIAL.println(altitude);
+          DEBUG_SERIAL.print("Ellipsoid: "); DEBUG_SERIAL.println(altitude);
 
           float accuracy = getAccuracy();
           static float lastAccuracy = 100.0;
@@ -660,8 +661,8 @@ void task_rtk_server_connection(void *pvParameters) {
             display.print(F(" deg"));
 
             display.setCursor(0, 40);
-            display.print("Elipsoid: ");
-            display.print(altitude, 4);
+            display.print("Ellipsoid: ");
+            display.print(altitude, 3);
             display.print(F(" m"));
 
             display.setCursor(0, 50);
@@ -929,6 +930,7 @@ bool setStaticLocationFromSPIFFS() {
   getIntLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
   printLocation(&baseLoc);
   // TODO: Call this after saveCurrentLocation()
+  bool response = true;
   response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10), baseLoc.alt_hp*10, true); 
   // response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
   // Or use Earth-centered coordinates:
