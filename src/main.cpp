@@ -50,7 +50,7 @@
 #include <Arduino.h>
 #include <Wire.h> // Display and uBlox GNSS
 #include <RTKBaseConfig.h>
-#include <RTKSecrets.h> // You need to create your own header file, like discribed in README.md
+#include <RTKCasterSecrets.h> // You need to create your own header file, like discribed in README.md
 
 /*******************************************************************************
  *                                 Display
@@ -257,7 +257,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     }
     DEBUG_SERIAL.print(F("Survey started. This will run until 60s has passed and less than "));
     DEBUG_SERIAL.print(desiredAccuracyInM);
-    DEBUG_SERIAL.println(F(" mm accuracy is achieved."));
+    DEBUG_SERIAL.println(F(" m achieved."));
 
     //Begin waiting for survey to complete
     while (myGNSS.getSurveyInValid() == false) // Call the helper function
@@ -266,7 +266,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
       // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
       // You can either read the data from packetUBXNAVSVIN directly
       // or can use the helper functions: getSurveyInActive; getSurveyInValid; getSurveyInObservationTime; and getSurveyInMeanAccuracy
-      response &= myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000ms timeout (req can take a long time)
+      response &= myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000 ms timeout (req can take a long time)
       if (response == true)
       {
         uint32_t timeElapsed = myGNSS.getSurveyInObservationTime();
@@ -380,22 +380,7 @@ void setupRTKBase(bool surveyEnabled) {
 
   if (!surveyEnabled) {
     // Latitude, Longitude, Altitude input:
-    location_int_t baseLoc;
-    getIntLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
-    printPositionAndAccuracy();
-    printLocation(&baseLoc);
-    response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, baseLoc.alt_hp, true); 
-    response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
-    // Or use Earth-centered coordinates:
-    //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
-    if (response == false) {
-      DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
-      while (true) {
-        delay(1000);
-      }
-    } else {
-      DEBUG_SERIAL.println(F("Static position set"));
-    }
+    setStaticLocationFromSPIFFS();
 
   } else {
     // Read safed target accuracy from SPIFFS
@@ -409,6 +394,7 @@ void setupRTKBase(bool surveyEnabled) {
 */
 
   DEBUG_SERIAL.println(F("Module configuration complete"));
+  // TODO: display settings
 }
 
 // This function gets called from the SparkFun u-blox Arduino Library.
@@ -498,7 +484,7 @@ void task_rtk_server_connection(void *pvParameters) {
       if (ntripCaster.connected() == false) {
           DEBUG_SERIAL.printf("Opening socket to %s\n", CASTER_HOST);
 
-        if (ntripCaster.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == true)  //Attempt connection
+        if (ntripCaster.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == true)  // Attempt connection
         {
             DEBUG_SERIAL.printf("Connected to %s:%d\n", casterHost.c_str(), (uint16_t)casterPort.toInt());
 
@@ -516,10 +502,13 @@ void task_rtk_server_connection(void *pvParameters) {
 
             // Wait for response
             unsigned long timeout = millis();
-            while (ntripCaster.available() == 0) {
+            while (!ntripCaster.available()) {
             if (millis() - timeout > 5000) {
                 DEBUG_SERIAL.println(F("Caster timed out!"));
                 ntripCaster.stop();
+                // TODO: display state
+                DEBUG_SERIAL.println(F("Make a break of 10 s to not get banned, and retry"));
+                delay(10000);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             delay(10);
@@ -538,8 +527,10 @@ void task_rtk_server_connection(void *pvParameters) {
             if (connectionSuccess == false) {
                 DEBUG_SERIAL.print(F("Failed to connect to Caster: ")); 
                 DEBUG_SERIAL.println(response);
-                if (String(response).equals("ICY 401 Unauthorized")) {
-                  DEBUG_SERIAL.println("You are banned from rtk2go.com!");
+                // TODO: display state
+                if (strstr(response, "401") > 0) { // look for "ICY 401 Unauthorized"
+                // if (String(response).equals("ICY 401 Unauthorized")) {
+                  DEBUG_SERIAL.println("You are banned from rtk2go.com! Freezing");
 
                   if (displayConnected) {
                     display.clearDisplay();
@@ -553,7 +544,10 @@ void task_rtk_server_connection(void *pvParameters) {
                     display.print("Check your NTRIP");
                     display.setCursor(0,40);
                     display.print("Client settings!");
+                    display.setCursor(0,50);
+                    display.print("Freezing...");
                   }
+                  while (true) {delay(1000);}
                 }
                 checkConnectionToWifiStation();
                 vTaskDelay(1000);
@@ -571,7 +565,7 @@ void task_rtk_server_connection(void *pvParameters) {
         lastReport_ms = millis();
         lastSentRTCM_ms = millis();
 
-        //This is the main sending loop. We scan for new ublox data but processRTCM() is where the data actually gets sent out.
+        // This is the main sending loop. We scan for new ublox data but processRTCM() is where the data actually gets sent out.
         while (ntripCaster.connected() == true) {
             myGNSS.checkUblox();  //See if new data is available. Process bytes as they come in.
 
@@ -609,13 +603,17 @@ void task_rtk_server_connection(void *pvParameters) {
 
           double lat = getLatitude();
           double lon = getLongitude();
-          int32_t alt = myGNSS.getAltitude();//getHeightOverSeaLevel();
-          DEBUG_SERIAL.print("Ellipsoidal altitude: "); DEBUG_SERIAL.println(alt);
-      
+          // int32_t alt = myGNSS.getAltitude();//getHeightOverSeaLevel();
+        
           int32_t msl = myGNSS.getMeanSeaLevel();
           DEBUG_SERIAL.print("Mean sea level altitude: "); DEBUG_SERIAL.println(msl);
           int8_t mslHp = myGNSS.getMeanSeaLevelHp();
           DEBUG_SERIAL.print("Mean sea level hp altitude: "); DEBUG_SERIAL.println(mslHp);
+
+          int32_t ellipsoid = myGNSS.getElipsoid();
+          int8_t ellipsoidHp = myGNSS.getElipsoidHp();
+          float altitude = getFloatAltFromIntegerParts(ellipsoid, ellipsoidHp);
+          DEBUG_SERIAL.print("Ellipsoidal altitude: "); DEBUG_SERIAL.println(altitude);
 
           float accuracy = getAccuracy();
           static float lastAccuracy = 100.0;
@@ -627,6 +625,7 @@ void task_rtk_server_connection(void *pvParameters) {
             if (saveLocation()) {
               DEBUG_SERIAL.println(F("Location updated, saved to file."));
               lastAccuracy = accuracy;
+              setStaticLocationFromSPIFFS();
               
             } else {
               DEBUG_SERIAL.println(F("Error saving location"));
@@ -659,7 +658,7 @@ void task_rtk_server_connection(void *pvParameters) {
 
             display.setCursor(0, 40);
             display.print("Elipsoid: ");
-            display.print(alt/1000.0, 3);
+            display.print(altitude, 4);
             display.print(F(" m"));
 
             display.setCursor(0, 50);
@@ -925,6 +924,25 @@ float getHeightOverSeaLevel() {
   return f_msl;
 }
 
+bool setStaticLocationFromSPIFFS() {
+  location_int_t baseLoc;
+  getIntLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
+  printLocation(&baseLoc);
+  // TODO: Call this after saveLocation()
+  response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10), baseLoc.alt_hp*10, true); 
+  // response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
+  // Or use Earth-centered coordinates:
+  //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
+  if (response == false) {
+    DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
+    while (true) {
+      delay(1000);
+    }
+  } else {
+    DEBUG_SERIAL.println(F("Static position set"));
+  }
 
+  return response;
+}
 
 

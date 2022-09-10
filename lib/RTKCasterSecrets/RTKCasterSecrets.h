@@ -1,5 +1,5 @@
-#ifndef RTK_SECRETS_H
-#define RTK_SECRETS_H
+#ifndef RTK_CASTER_SECRETS_H
+#define RTK_CASTER_SECRETS_H
 #include <Arduino.h>
 // A place for your default caster credentials
 
@@ -85,4 +85,4 @@ const int CONNECTION_TIMEOUT_MS = 10000; // Shorter timeouts lead to complaining
 // const char MOUNT_POUNT[] = "MP7156"; //The mount point you want to push data to
 // const char mountPointPW[] = "732taa";
 
-#endif /*** RTK_SECRETS_H ***/
+#endif /*** RTK_CASTER_SECRETS_H ***/
