@@ -121,7 +121,7 @@ double getLongitude(void);
 double getLatitude(void);
 float getHeightOverSeaLevel(void);
 float getAccuracy(void);
-bool saveLocation(void);
+bool saveCurrentLocation(void);
 void printLocation(location_int_t *location);
 void printPositionAndAccuracy(void);
 void task_rtk_server_connection(void *pvParameters);
@@ -622,11 +622,14 @@ void task_rtk_server_connection(void *pvParameters) {
           
 
           if (lastAccuracy > accuracy) {
-            if (saveLocation()) {
+            if (saveCurrentLocation()) {
               DEBUG_SERIAL.println(F("Location updated, saved to file."));
               lastAccuracy = accuracy;
-              setStaticLocationFromSPIFFS();
-              
+              // Send saved values to RTK2 device
+              if (setStaticLocationFromSPIFFS()) {
+                // Be sure this values are used after reboot
+                setLocationMethodCoords();  
+              }
             } else {
               DEBUG_SERIAL.println(F("Error saving location"));
             }
@@ -841,18 +844,18 @@ void printPositionAndAccuracy() {
     DEBUG_SERIAL.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
 }
 
-bool saveLocation() {
-    DEBUG_SERIAL.println("saveLocation() entered.");
+bool saveCurrentLocation() {
     int32_t latitude = myGNSS.getHighResLatitude();
     int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
     int32_t longitude = myGNSS.getHighResLongitude();
     int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
+    // Choose ellipsoid model for altitude value
     int32_t ellipsoid = myGNSS.getElipsoid();
     int8_t ellipsoidHp = myGNSS.getElipsoidHp();
-    int32_t msl = myGNSS.getMeanSeaLevel();
-    int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-    DEBUG_SERIAL.print("msl: ");DEBUG_SERIAL.print(msl);
-    DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
+    // int32_t msl = myGNSS.getMeanSeaLevel();
+    // int8_t mslHp = myGNSS.getMeanSeaLevelHp();
+    // DEBUG_SERIAL.print("msl: ");DEBUG_SERIAL.print(msl);
+    // DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
     uint32_t accuracy = myGNSS.getHorizontalAccuracy();
 
     bool success = true;
@@ -866,9 +869,6 @@ bool saveLocation() {
     // success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
     csvStr = String(ellipsoid) + SEP + String(ellipsoidHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
-    if (success) {
-      setLocationMethodCoords();
-    }
     return success;
 }
 
@@ -928,7 +928,7 @@ bool setStaticLocationFromSPIFFS() {
   location_int_t baseLoc;
   getIntLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
   printLocation(&baseLoc);
-  // TODO: Call this after saveLocation()
+  // TODO: Call this after saveCurrentLocation()
   response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10), baseLoc.alt_hp*10, true); 
   // response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
   // Or use Earth-centered coordinates:
