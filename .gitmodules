@@ -9,3 +9,7 @@
 	path = lib/RTKRoverManager
 	url = https://github.com/audio-communication-group/RTKRoverManager.git
 	branch = main
+[submodule "lib/RTKBaseManager"]
+	path = lib/RTKBaseManager
+	url = https://github.com/audio-communication-group/RTKBaseManager.git
+	branch = main
