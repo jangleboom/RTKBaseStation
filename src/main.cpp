@@ -154,6 +154,8 @@ void setup() {
   location_t lastLocation;
   if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) {
     printLocation(&lastLocation);
+  } else {
+    DEBUG_SERIAL.println(F("No valid location found in SPIFFS"));
   }
 
   wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set here too  
@@ -173,13 +175,6 @@ void setup() {
    delay(500);
  }
   startServer(&server);
-         
-  // bin_sem_check_wifi = xSemaphoreCreateBinary();
-   // Force reboot if we can't create the semaphore
-  // if (bin_sem_check_wifi == NULL) {
-  //   DEBUG_SERIAL.println("Could not create semaphore(s)");
-  //   ESP.restart();
-  // }
 
   xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_PRIORITY, NULL, RUNNING_CORE_0);
   // xTaskCreatePinnedToCore( &task_check_wifi_connection, "task_check_wifi_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
@@ -317,8 +312,8 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     }
     
     DEBUG_SERIAL.println(F("Survey valid!"));
-    DEBUG_SERIAL.println(F("Accuracy"));
-    DEBUG_SERIAL.print(getAccuracy()); 
+    DEBUG_SERIAL.println(F("Accuracy: "));
+    DEBUG_SERIAL.print(myGNSS.getSurveyInMeanAccuracy()); 
     DEBUG_SERIAL.println(F(" m"));
     DEBUG_SERIAL.println(F("Base survey complete! RTCM now broadcasting."));
 
@@ -600,7 +595,7 @@ void task_rtk_server_connection(void *pvParameters) {
         if (millis() - lastReport_ms > 10000) {
           lastReport_ms += 10000;
           DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
-          printPositionAndAccuracy();
+          // printPositionAndAccuracy();
           // TODO: may show ohnly the saved values?
           double lat = getLatitude();
           double lon = getLongitude();
@@ -855,7 +850,7 @@ bool saveCurrentLocation() {
     // success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
     csvStr = String(ellipsoid) + SEP + String(ellipsoidHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_COORD_ACCURACY, String(accuracy).c_str());
+    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_COORD_ACCURACY, String(accuracy, 4).c_str());
     return success;
 }
 
@@ -891,8 +886,6 @@ float getAccuracy() {
   f_accuracy = accuracy;
   // Now convert to m
   f_accuracy = f_accuracy / 10000.0; // Convert from mm * 10^-1 to m
-  DEBUG_SERIAL.print("horizontal Acc.: ");
-  DEBUG_SERIAL.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
 
   return f_accuracy;
 }
