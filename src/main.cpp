@@ -152,7 +152,7 @@ void setup() {
   DEBUG_SERIAL.print(F("Location method: ")); DEBUG_SERIAL.println(locationMethod);
   
   location_t lastLocation;
-  if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE)) {
+  if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) {
     printLocation(&lastLocation);
   }
 
@@ -913,7 +913,7 @@ float getHeightOverSeaLevel() {
 
 bool setStaticLocationFromSPIFFS() {
   location_t baseLoc;
-  getLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
+  getLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY);
   printLocation(&baseLoc);
   bool response = true;
   // TODO: This is not right: (int32_t)(baseLoc.alt/10)
