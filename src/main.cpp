@@ -123,7 +123,6 @@ float getHeightOverSeaLevel(void);
 float getAccuracy(void);
 bool saveCurrentLocation(void);
 bool setStaticLocationFromSPIFFS(void);
-void printLocation(location_int_t *location);
 void printPositionAndAccuracy(void);
 void task_rtk_server_connection(void *pvParameters);
 // void task_check_wifi_connection(void *pvParameters);
@@ -152,12 +151,12 @@ void setup() {
   String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
   DEBUG_SERIAL.print(F("Location method: ")); DEBUG_SERIAL.println(locationMethod);
   
-  location_int_t lastLocation;
-  if (getIntLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE)) {
-    printIntLocation(&lastLocation);
+  location_t lastLocation;
+  if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE)) {
+    printLocation(&lastLocation);
   }
 
-  wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
+  wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set here too  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
@@ -182,7 +181,7 @@ void setup() {
   //   ESP.restart();
   // }
 
-  xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_PRIORITY, NULL, RUNNING_CORE_0);
   // xTaskCreatePinnedToCore( &task_check_wifi_connection, "task_check_wifi_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   
   String thisBoard = ARDUINO_BOARD;
@@ -575,6 +574,7 @@ void task_rtk_server_connection(void *pvParameters) {
             //So let's not leave the socket open/hanging without data
             if (millis() - lastSentRTCM_ms > maxTimeBeforeHangup_ms) {
                 const String status = "RTCM timeout. Disconnecting...";
+                //TODO: display this state
                 DEBUG_SERIAL.println(status);
                 ntripCaster.stop();
 
@@ -601,7 +601,7 @@ void task_rtk_server_connection(void *pvParameters) {
           lastReport_ms += 10000;
           DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
           printPositionAndAccuracy();
-
+          // TODO: may show ohnly the saved values?
           double lat = getLatitude();
           double lon = getLongitude();
           // int32_t alt = myGNSS.getAltitude();//getHeightOverSeaLevel();
@@ -761,21 +761,6 @@ String secondsToTimeFormat(uint32_t sec) {  //Time we are converting. This can b
   return hhMmmSs;
 }
 
-void printLocation(location_int_t *loc) {
-  DEBUG_SERIAL.print("lat: ");
-  DEBUG_SERIAL.println(loc->lat);
-  DEBUG_SERIAL.print("lat_hp: ");
-  DEBUG_SERIAL.println(loc->lat_hp);
-  DEBUG_SERIAL.print("lon: ");
-  DEBUG_SERIAL.println(loc->lon);
-  DEBUG_SERIAL.print("lon_hp: ");
-  DEBUG_SERIAL.println(loc->lon_hp);
-  DEBUG_SERIAL.print("alt: ");
-  DEBUG_SERIAL.println(loc->alt);
-  DEBUG_SERIAL.print("alt_hp: ");
-  DEBUG_SERIAL.println(loc->alt_hp);
-}
-
 void printPositionAndAccuracy() {
     // getHighResLatitude: returns the latitude from HPPOSLLH as an int32_t in degrees * 10^-7
     // getHighResLatitudeHp: returns the high resolution component of latitude from HPPOSLLH as an int8_t in degrees * 10^-9
@@ -857,7 +842,7 @@ bool saveCurrentLocation() {
     // int8_t mslHp = myGNSS.getMeanSeaLevelHp();
     // DEBUG_SERIAL.print("msl: ");DEBUG_SERIAL.print(msl);
     // DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
-    uint32_t accuracy = myGNSS.getHorizontalAccuracy();
+    float accuracy = getAccuracy();
 
     bool success = true;
     String csvStr = String(latitude) + SEP + String(latitudeHp);
@@ -870,6 +855,7 @@ bool saveCurrentLocation() {
     // success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
     csvStr = String(ellipsoid) + SEP + String(ellipsoidHp);
     success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
+    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_COORD_ACCURACY, String(accuracy).c_str());
     return success;
 }
 
@@ -926,12 +912,12 @@ float getHeightOverSeaLevel() {
 }
 
 bool setStaticLocationFromSPIFFS() {
-  location_int_t baseLoc;
-  getIntLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
+  location_t baseLoc;
+  getLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE);
   printLocation(&baseLoc);
-  // TODO: Call this after saveCurrentLocation()
   bool response = true;
-  response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10), baseLoc.alt_hp*10, true); 
+  // TODO: This is not right: (int32_t)(baseLoc.alt/10)
+  response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10), (int8_t)(baseLoc.alt%10)+ baseLoc.alt_hp, true); 
   // response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
   // Or use Earth-centered coordinates:
   //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts

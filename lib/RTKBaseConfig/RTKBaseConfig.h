@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef RTK_BASE_CONFIG_H
+#define RTK_BASE_CONFIG_H
 #include <Arduino.h>
 
 // Deactivate brown out detection
@@ -61,7 +61,8 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 #define RUNNING_CORE_1                1  // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
-#define GNSS_WIFI_PRIORITY             2  // GNSS/WiFi should have a lower priority
+#define WIFI_PRIORITY             1  // WiFi connection
+#define GNSS_PRIORITY             2  // GNSS should have a lower priority
 #define RTK_TASK_INTERVAL_MS          10
 #define CHECK_WIFI_INTERVAL_MS        30000
 /*******************************************************************************
@@ -69,7 +70,7 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
  * ****************************************************************************/
 
 
-#endif /*** HTRTK_CONFIG_H ***/
+#endif /*** RTK_BASE_CONFIG_H ***/
 
 
 
