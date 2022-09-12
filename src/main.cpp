@@ -125,7 +125,7 @@ bool saveCurrentLocation(void);
 bool setStaticLocationFromSPIFFS(void);
 void printPositionAndAccuracy(void);
 void task_rtk_server_connection(void *pvParameters);
-// void task_check_wifi_connection(void *pvParameters);
+void task_check_wifi_connection(void *pvParameters);
 // static SemaphoreHandle_t bin_sem_check_wifi = NULL; 
 // Help funcs
 String secondsToTimeFormat(uint32_t sec);
@@ -177,7 +177,7 @@ void setup() {
   startServer(&server);
 
   xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_PRIORITY, NULL, RUNNING_CORE_0);
-  // xTaskCreatePinnedToCore( &task_check_wifi_connection, "task_check_wifi_connection", 20480, NULL, GNSS_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_check_wifi_connection, "task_check_wifi_connection", 20480, NULL, WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   
   String thisBoard = ARDUINO_BOARD;
   DEBUG_SERIAL.print(F("Setup done on "));
@@ -407,8 +407,20 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
  *                                 WiFi
  * ****************************************************************************/
 
+void task_check_wifi_connection(void *pvParameters) {
+    (void)pvParameters;
+
+    while (true) {
+       vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
+       checkConnectionToWifiStation();
+    }
+    // Delete self task
+    vTaskDelete(NULL);
+}
+
 void task_rtk_server_connection(void *pvParameters) {
     (void)pvParameters;
+
     Wire.setClock(I2C_FREQUENCY_100K);
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
@@ -461,14 +473,15 @@ void task_rtk_server_connection(void *pvParameters) {
     String longitude = readFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE);
     String altitude = readFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE);
 
-    bool surveyEnabled = true;
-    surveyEnabled &=  locationMethod.isEmpty() || \
+    bool startSurvey = true;
+    startSurvey &=  locationMethod.isEmpty() || \
                       locationMethod.equals("survey_enabled") || \
                       latitude.isEmpty() || \
                       longitude.isEmpty() || \
                       altitude.isEmpty();
-    DEBUG_SERIAL.printf("task_rtk_server_connection, surveyEnabled: %s\n", surveyEnabled ? "yes" : "no");
-    setupRTKBase(surveyEnabled);
+
+    DEBUG_SERIAL.printf("task_rtk_server_connection, surveyEnabled: %s\n", startSurvey ? "yes" : "no");
+    setupRTKBase(startSurvey);
 
     while (true) {
       // beginServing() func content from Sparkfun example ZED-F9P/Example4_BaseWithLCD
@@ -544,14 +557,14 @@ void task_rtk_server_connection(void *pvParameters) {
                   }
                   while (true) {delay(1000);}
                 }
-                checkConnectionToWifiStation();
+                // checkConnectionToWifiStation();
                 vTaskDelay(1000);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             }  // End attempt to connect
             else {
                 DEBUG_SERIAL.println(F("Connection to host failed"));
-                checkConnectionToWifiStation();
+                // checkConnectionToWifiStation();
                 vTaskDelay(1000);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
             }
@@ -602,14 +615,14 @@ void task_rtk_server_connection(void *pvParameters) {
           // int32_t alt = myGNSS.getAltitude();//getHeightOverSeaLevel();
         
           int32_t msl = myGNSS.getMeanSeaLevel();
-          DEBUG_SERIAL.print("Mean sea level altitude: "); DEBUG_SERIAL.println(msl);
           int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-          DEBUG_SERIAL.print("Mean sea level hp altitude: "); DEBUG_SERIAL.println(mslHp);
+          float altitude = getFloatAltFromIntegerParts(msl, mslHp);
+          DEBUG_SERIAL.print("Mean seal level: "); DEBUG_SERIAL.println(altitude);
 
           int32_t ellipsoid = myGNSS.getElipsoid();
           int8_t ellipsoidHp = myGNSS.getElipsoidHp();
-          float altitude = getFloatAltFromIntegerParts(ellipsoid, ellipsoidHp);
-          DEBUG_SERIAL.print("Ellipsoid: "); DEBUG_SERIAL.println(altitude);
+          // float altitude = getFloatAltFromIntegerParts(ellipsoid, ellipsoidHp);
+          // DEBUG_SERIAL.print("Ellipsoid: "); DEBUG_SERIAL.println(altitude);
 
           float accuracy = getAccuracy();
           static float lastAccuracy = 100.0;
@@ -833,10 +846,12 @@ bool saveCurrentLocation() {
     // Choose ellipsoid model for altitude value
     int32_t ellipsoid = myGNSS.getElipsoid();
     int8_t ellipsoidHp = myGNSS.getElipsoidHp();
-    // int32_t msl = myGNSS.getMeanSeaLevel();
-    // int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-    // DEBUG_SERIAL.print("msl: ");DEBUG_SERIAL.print(msl);
-    // DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
+    int32_t msl = myGNSS.getMeanSeaLevel();
+    int8_t mslHp = myGNSS.getMeanSeaLevelHp();
+    DEBUG_SERIAL.print("ellipsoid: ");DEBUG_SERIAL.print(ellipsoid);
+    DEBUG_SERIAL.print(", ellipsoidHp: ");DEBUG_SERIAL.println(ellipsoidHp);
+    DEBUG_SERIAL.print("msl: ");DEBUG_SERIAL.print(msl);
+    DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
     float accuracy = getAccuracy();
 
     bool success = true;
@@ -910,6 +925,7 @@ bool setStaticLocationFromSPIFFS() {
   printLocation(&baseLoc);
   bool response = true;
   // TODO: This is not right: (int32_t)(baseLoc.alt/10)
+  // response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, baseLoc.alt_hp, true); 
   response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10), (int8_t)(baseLoc.alt%10)+ baseLoc.alt_hp, true); 
   // response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
   // Or use Earth-centered coordinates:
