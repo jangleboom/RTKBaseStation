@@ -53,6 +53,12 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 /*******************************************************************************
  *                         Oled
  * ****************************************************************************/
+#define OLED_I2C_ADDR 0x3c
+#define SCREEN_WIDTH 128  // OLED display width, in pixels
+#define SCREEN_HEIGHT 64  // OLED display height, in pixels
+// #define SDA_PIN 4
+// #define SCL_PIN 5
+#define OLED_RESET -1   //   QT-PY / XIAO
 
 /*******************************************************************************
  *                         FreeRTOS
@@ -65,10 +71,6 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 #define GNSS_PRIORITY                 2  // GNSS should have a lower priority
 #define RTK_TASK_INTERVAL_MS          10
 #define WIFI_TASK_INTERVAL_MS         30000
-#define CHECK_WIFI_INTERVAL_MS        30000
-/*******************************************************************************
- *                         Help Functions
- * ****************************************************************************/
 
 
 #endif /*** RTK_BASE_CONFIG_H ***/

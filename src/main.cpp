@@ -59,12 +59,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
 
-#define OLED_I2C_ADDR 0x3c
-#define SCREEN_WIDTH 128  // OLED display width, in pixels
-#define SCREEN_HEIGHT 64  // OLED display height, in pixels
-// #define SDA_PIN 4
-// #define SCL_PIN 5
-#define OLED_RESET -1   //   QT-PY / XIAO
 // Global objects
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 bool displayConnected;
@@ -92,8 +86,9 @@ void buttonHandler(Button2 &btn);
 using namespace RTKBaseManager;
 AsyncWebServer server(80);
 
-
 String scannedSSIDs[MAX_SSIDS];
+
+void setupWifi(void);
 
 // Globals
 WiFiClient ntripCaster;
@@ -120,13 +115,13 @@ void runSurvey(float desiredAccuracyInM, bool resp);
 double getLongitude(void);
 double getLatitude(void);
 float getHeightOverSeaLevel(void);
-float getAccuracy(void);
+float getHorizontalAccuracy(void);
 bool saveCurrentLocation(void);
 bool setStaticLocationFromSPIFFS(void);
 void printPositionAndAccuracy(void);
+void displaySavedLocation(location_t* loc);
 void task_rtk_server_connection(void *pvParameters);
-void task_check_wifi_connection(void *pvParameters);
-// static SemaphoreHandle_t bin_sem_check_wifi = NULL; 
+
 // Help funcs
 String secondsToTimeFormat(uint32_t sec);
 
@@ -162,23 +157,10 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  WiFi.setHostname(DEVICE_NAME);
-  // Check if we have credentials for a available network
-  String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
-  String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
-
-  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
-    setupAPMode(AP_SSID, AP_PASSWORD);
-    delay(500);
-  } else {
-   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
-   delay(500);
- }
-  startServer(&server);
+  setupWifi();
 
   xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_PRIORITY, NULL, RUNNING_CORE_0);
-  xTaskCreatePinnedToCore( &task_check_wifi_connection, "task_check_wifi_connection", 20480, NULL, WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  
+
   String thisBoard = ARDUINO_BOARD;
   DEBUG_SERIAL.print(F("Setup done on "));
   DEBUG_SERIAL.println(thisBoard);
@@ -193,7 +175,27 @@ void loop() {
 }
 
 /*******************************************************************************
- *                                 RTK/GNSS
+ *                                 Wifi
+ * ****************************************************************************/
+
+void setupWifi() {
+  WiFi.setHostname(DEVICE_NAME);
+  // Check if we have credentials for a available network
+  String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
+  String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
+
+  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
+    setupAPMode(AP_SSID, AP_PASSWORD);
+    delay(500);
+  } else {
+   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
+   delay(500);
+ }
+  startServer(&server);
+}
+
+/*******************************************************************************
+ *                                 RTK
  * ****************************************************************************/
 
 float getDesiredSurveyAccuracy(const char* path) {
@@ -207,19 +209,19 @@ float getDesiredSurveyAccuracy(const char* path) {
 
 void runSurvey(float desiredAccuracyInM, bool resp) {
     //Alternatively to setting a static position, you could do a survey-in
-    //but it takes much longer to start generating RTCM data. See Example4_BaseWithLCD
+    // but it takes much longer to start generating RTCM data. See Example4_BaseWithLCD
     // Check if Survey is in Progress before initiating one
     // From v2.0, the data from getSurveyStatus (UBX-NAV-SVIN) is returned in UBX_NAV_SVIN_t packetUBXNAVSVIN
     // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
     // You can either read the data from packetUBXNAVSVIN directly
     // or can use the helper functions: getSurveyInActive; getSurveyInValid; getSurveyInObservationTime; and getSurveyInMeanAccuracy
     bool response = resp;
-    response &= myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000ms timeout (request can take a long time)
+    response &= myGNSS.getSurveyStatus(2000); // Query module for SVIN status with 2000ms timeout (request can take a long time)
     if (response == false)
     {
       DEBUG_SERIAL.println(F("Failed to get Survey In status. Freezing."));
       while (true) {
-        delay(1000);
+        vTaskDelay(1000/portTICK_PERIOD_MS);
       }; //Freeze
     }
 
@@ -228,8 +230,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
       delay(500);
     }
  
-    //Start survey
-    // response = myGNSS.enableSurveyModeFull(60, 1.0); //Enable Survey in, 60 seconds, 1.0m
+    // Start survey
     response = myGNSS.enableSurveyModeFull(60, desiredAccuracyInM); //Enable Survey in, 60 seconds, desiredAccuracyInM (m)
     if (response == false)
     {
@@ -254,7 +255,7 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     DEBUG_SERIAL.print(desiredAccuracyInM);
     DEBUG_SERIAL.println(F(" m achieved."));
 
-    //Begin waiting for survey to complete
+    // Begin waiting for survey to complete
     while (myGNSS.getSurveyInValid() == false) // Call the helper function
     {
       // From v2.0, the data from getSurveyStatus (UBX-NAV-SVIN) is returned in UBX_NAV_SVIN_t packetUBXNAVSVIN
@@ -268,15 +269,9 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
         float meanAccuracy = myGNSS.getSurveyInMeanAccuracy();
 
         DEBUG_SERIAL.print(F("Time elapsed: "));
-        DEBUG_SERIAL.print((String)myGNSS.getSurveyInObservationTime()); // Call the helper function
+        DEBUG_SERIAL.print(secondsToTimeFormat(timeElapsed)); 
         DEBUG_SERIAL.print(F(" Accuracy: "));
-        DEBUG_SERIAL.println(meanAccuracy); // Call the helper function
-
-        if (checkConnectionToWifiStation()) {
-          DEBUG_SERIAL.println(F("WiFi connection established"));
-        } else {
-          DEBUG_SERIAL.println(F("Error connecting to WiFi station"));
-        };
+        DEBUG_SERIAL.println(meanAccuracy); 
 
         if (displayConnected) {
           display.clearDisplay();
@@ -286,8 +281,10 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
           display.setCursor(0, 10);
           display.print(F("IP: "));
           display.print(WiFi.localIP());
-          display.setCursor(0, 20);
-          display.print(F("http://"));display.print(DEVICE_NAME);display.print(F(".local"));
+          if (WiFi.isConnected()) {
+            display.setCursor(0, 20);
+            display.print(F("http://"));display.print(DEVICE_NAME);display.print(F(".local"));
+          }
           display.setCursor(0, 30);
           display.print(F("Survey: "));
           display.print(secondsToTimeFormat(timeElapsed)); // Call the helper function
@@ -323,8 +320,6 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     // Because setting an incorrect static position will disable the ability to get a lock, we will skip saving during this example
     // if (myGNSS.saveConfiguration() == false) //Save the current settings to flash and BBR
     // 
-
-    // TODO: save location
 }
 
 void setupRTKBase(bool surveyEnabled) {
@@ -373,10 +368,10 @@ void setupRTKBase(bool surveyEnabled) {
   } else
     DEBUG_SERIAL.println(F("RTCM sentences enabled"));
 
+  // Did you entered high precision location data into the web form?
   if (!surveyEnabled) {
     // Latitude, Longitude, Altitude input:
     setStaticLocationFromSPIFFS();
-
   } else {
     // Read safed target accuracy from SPIFFS
     float desiredAcc = getDesiredSurveyAccuracy(PATH_RTK_LOCATION_SURVEY_ACCURACY);
@@ -404,19 +399,8 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
 }
 
 /*******************************************************************************
- *                                 WiFi
+ *                                 FreeRTOS
  * ****************************************************************************/
-
-void task_check_wifi_connection(void *pvParameters) {
-    (void)pvParameters;
-
-    while (true) {
-       vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
-       checkConnectionToWifiStation();
-    }
-    // Delete self task
-    vTaskDelete(NULL);
-}
 
 void task_rtk_server_connection(void *pvParameters) {
     (void)pvParameters;
@@ -488,6 +472,11 @@ void task_rtk_server_connection(void *pvParameters) {
       
       taskStart:
 
+      // First and again: check wifi connection
+      while (!checkConnectionToWifiStation()) {
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+      }
+
       // Connect if we are not already
       if (ntripCaster.connected() == false) {
           DEBUG_SERIAL.printf("Opening socket to %s\n", CASTER_HOST);
@@ -514,9 +503,9 @@ void task_rtk_server_connection(void *pvParameters) {
             if (millis() - timeout > 5000) {
                 DEBUG_SERIAL.println(F("Caster timed out!"));
                 ntripCaster.stop();
-                // TODO: display state
+                // TODO: display state and reboot after 5x fails(?)
                 DEBUG_SERIAL.println(F("Make a break of 10 s to not get banned, and retry"));
-                delay(10000);
+                vTaskDelay(10000/portTICK_PERIOD_MS);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             delay(10);
@@ -564,8 +553,8 @@ void task_rtk_server_connection(void *pvParameters) {
             }  // End attempt to connect
             else {
                 DEBUG_SERIAL.println(F("Connection to host failed"));
-                // checkConnectionToWifiStation();
-                vTaskDelay(1000);
+
+                vTaskDelay(10000/portTICK_PERIOD_MS);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
             }
         }  // End connected == false
@@ -604,47 +593,47 @@ void task_rtk_server_connection(void *pvParameters) {
 
         delay(10);
 
-        //Report some statistics every 10000
+        // Report some statistics every 10000
         if (millis() - lastReport_ms > 10000) {
           lastReport_ms += 10000;
           DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
-          // printPositionAndAccuracy();
-          // TODO: may show ohnly the saved values?
           double lat = getLatitude();
           double lon = getLongitude();
-          // int32_t alt = myGNSS.getAltitude();//getHeightOverSeaLevel();
         
-          int32_t msl = myGNSS.getMeanSeaLevel();
-          int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-          float altitude = getFloatAltFromIntegerParts(msl, mslHp);
-          DEBUG_SERIAL.print("Mean seal level: "); DEBUG_SERIAL.println(altitude);
+          // int32_t msl = myGNSS.getMeanSeaLevel();
+          // int8_t mslHp = myGNSS.getMeanSeaLevelHp();
+          // DEBUG_SERIAL.print("msl: "); DEBUG_SERIAL.println(msl);
+          // DEBUG_SERIAL.print("mslHp: "); DEBUG_SERIAL.println(mslHp);
+          // float f_msl = getFloatAltFromIntegerParts(msl, mslHp);
+          // DEBUG_SERIAL.print("f_msl: "); DEBUG_SERIAL.println(f_msl);
 
-          int32_t ellipsoid = myGNSS.getElipsoid();
-          int8_t ellipsoidHp = myGNSS.getElipsoidHp();
-          // float altitude = getFloatAltFromIntegerParts(ellipsoid, ellipsoidHp);
-          // DEBUG_SERIAL.print("Ellipsoid: "); DEBUG_SERIAL.println(altitude);
+          int32_t elipsoid = myGNSS.getElipsoid();
+          int8_t elipsoidHp = myGNSS.getElipsoidHp();
+          DEBUG_SERIAL.print("elipsoid: "); DEBUG_SERIAL.println(elipsoid);
+          DEBUG_SERIAL.print("elipsoidHp: "); DEBUG_SERIAL.println(elipsoidHp);
+          float f_elipsoid = getFloatAltFromIntegerParts(elipsoid, elipsoidHp);
+          DEBUG_SERIAL.print("f_elipsoid: "); DEBUG_SERIAL.println(f_elipsoid);
 
-          float accuracy = getAccuracy();
-          static float lastAccuracy = 100.0;
-          DEBUG_SERIAL.print("lastAccuracy: "); DEBUG_SERIAL.println(lastAccuracy, 4);
+          float accuracy = getHorizontalAccuracy();
+          static float lastAccuracy = 999.;
           DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
+
+          // if (lastAccuracy > accuracy) {
+          //   if (saveCurrentLocation()) {
+          //     DEBUG_SERIAL.println(F("Location updated, saved to file."));
+          //     lastAccuracy = accuracy;
+          //     // Send saved values to RTK2 device
+          //     if (setStaticLocationFromSPIFFS()) {
+          //       // Be sure this values are used after reboot
+          //       setLocationMethodCoords();  
+          //     }
+          //   } else {
+          //     DEBUG_SERIAL.println(F("Error saving location"));
+          //   }
+          // } 
           
-
-          if (lastAccuracy > accuracy) {
-            if (saveCurrentLocation()) {
-              DEBUG_SERIAL.println(F("Location updated, saved to file."));
-              lastAccuracy = accuracy;
-              // Send saved values to RTK2 device
-              if (setStaticLocationFromSPIFFS()) {
-                // Be sure this values are used after reboot
-                setLocationMethodCoords();  
-              }
-            } else {
-              DEBUG_SERIAL.println(F("Error saving location"));
-            }
-          } 
-
-          if (displayConnected) {
+          // Show location data
+          if (displayConnected ) {
             static int8_t displayRefereshCnt = 0;
             displayRefereshCnt++;
             displayRefereshCnt %= 4;
@@ -669,8 +658,8 @@ void task_rtk_server_connection(void *pvParameters) {
             display.print(F(" deg"));
 
             display.setCursor(0, 40);
-            display.print("Ellipsoid: ");
-            display.print(altitude, 3);
+            display.print("Elipsoid: ");
+            display.print(f_elipsoid, 4); // or use f_elipsoid
             display.print(F(" m"));
 
             display.setCursor(0, 50);
@@ -682,16 +671,9 @@ void task_rtk_server_connection(void *pvParameters) {
             if (displayRefereshCnt == 2) display.print(F("-->"));
             if (displayRefereshCnt == 3) display.print(F("--->"));
             display.display();
-          }
+            }
           }
         } // End while (ntripCaster.connected() == true)
-
-        // If connection lost, first check WiFi
-        if (checkConnectionToWifiStation()) {
-          DEBUG_SERIAL.println(F("WiFi connection established"));
-        } else {
-          DEBUG_SERIAL.println(F("Error connecting to WiFi station"));
-        };
 
         // Measure stack size (last was 17772)
         uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -774,8 +756,8 @@ void printPositionAndAccuracy() {
     // getHighResLatitudeHp: returns the high resolution component of latitude from HPPOSLLH as an int8_t in degrees * 10^-9
     // getHighResLongitude: returns the longitude from HPPOSLLH as an int32_t in degrees * 10^-7
     // getHighResLongitudeHp: returns the high resolution component of longitude from HPPOSLLH as an int8_t in degrees * 10^-9
-    // getElipsoid: returns the height above ellipsoid as an int32_t in mm
-    // getElipsoidHp: returns the high resolution component of the height above ellipsoid as an int8_t in mm * 10^-1
+    // getElipsoid: returns the height above elipsoid as an int32_t in mm
+    // getElipsoidHp: returns the high resolution component of the height above elipsoid as an int8_t in mm * 10^-1
     // getMeanSeaLevel: returns the height above mean sea level as an int32_t in mm
     // getMeanSeaLevelHp: returns the high resolution component of the height above mean sea level as an int8_t in mm * 10^-1
     // getHorizontalAccuracy: returns the horizontal accuracy estimate from HPPOSLLH as an uint32_t in mm * 10^-1
@@ -785,8 +767,8 @@ void printPositionAndAccuracy() {
     int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
     int32_t longitude = myGNSS.getHighResLongitude();
     int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
-    int32_t ellipsoid = myGNSS.getElipsoid();
-    int8_t ellipsoidHp = myGNSS.getElipsoidHp();
+    int32_t elipsoid = myGNSS.getElipsoid();
+    int8_t elipsoidHp = myGNSS.getElipsoidHp();
     int32_t msl = myGNSS.getMeanSeaLevel();
     int8_t mslHp = myGNSS.getMeanSeaLevelHp();
     uint32_t accuracy = myGNSS.getHorizontalAccuracy();
@@ -808,14 +790,14 @@ void printPositionAndAccuracy() {
     DEBUG_SERIAL.println(d_lon, 9);
 
     // Now define float storage for the heights and accuracy
-    float f_ellipsoid;
+    float f_elipsoid;
     float f_msl;
     float f_accuracy;
 
-    // Calculate the height above ellipsoid in mm * 10^-1
-    f_ellipsoid = (ellipsoid * 10) + ellipsoidHp;
+    // Calculate the height above elipsoid in mm * 10^-1
+    f_elipsoid = (elipsoid * 10) + elipsoidHp;
     // Now convert to m
-    f_ellipsoid = f_ellipsoid / 10000.0; // Convert from mm * 10^-1 to m
+    f_elipsoid = f_elipsoid / 10000.0; // Convert from mm * 10^-1 to m
 
     // Calculate the height above mean sea level in mm * 10^-1
     f_msl = (msl * 10) + mslHp;
@@ -828,45 +810,14 @@ void printPositionAndAccuracy() {
     f_accuracy = f_accuracy / 10000.0; // Convert from mm * 10^-1 to m
 
     // Finally, do the printing
-    DEBUG_SERIAL.print(", Ellipsoid (m): ");
-    DEBUG_SERIAL.print(f_ellipsoid, 3); // Print the ellipsoid with 4 decimal places
+    DEBUG_SERIAL.print(", elipsoid (m): ");
+    DEBUG_SERIAL.print(f_elipsoid, 3); // Print the elipsoid with 4 decimal places
 
     DEBUG_SERIAL.print(", Mean Sea Level (m): ");
     DEBUG_SERIAL.print(f_msl, 4); // Print the mean sea level with 4 decimal places
 
     DEBUG_SERIAL.print(", Accuracy (m): ");
     DEBUG_SERIAL.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
-}
-
-bool saveCurrentLocation() {
-    int32_t latitude = myGNSS.getHighResLatitude();
-    int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
-    int32_t longitude = myGNSS.getHighResLongitude();
-    int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
-    // Choose ellipsoid model for altitude value
-    int32_t ellipsoid = myGNSS.getElipsoid();
-    int8_t ellipsoidHp = myGNSS.getElipsoidHp();
-    int32_t msl = myGNSS.getMeanSeaLevel();
-    int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-    DEBUG_SERIAL.print("ellipsoid: ");DEBUG_SERIAL.print(ellipsoid);
-    DEBUG_SERIAL.print(", ellipsoidHp: ");DEBUG_SERIAL.println(ellipsoidHp);
-    DEBUG_SERIAL.print("msl: ");DEBUG_SERIAL.print(msl);
-    DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
-    float accuracy = getAccuracy();
-
-    bool success = true;
-    String csvStr = String(latitude) + SEP + String(latitudeHp);
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LATITUDE, csvStr.c_str());
-    csvStr = "";
-    csvStr = String(longitude) + SEP + String(longitudeHp);
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE, csvStr.c_str());
-    csvStr = "";
-    // csvStr = String(msl) + SEP + String(mslHp);
-    // success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
-    csvStr = String(ellipsoid) + SEP + String(ellipsoidHp);
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_COORD_ACCURACY, String(accuracy, 4).c_str());
-    return success;
 }
 
 double getLatitude() {
@@ -894,7 +845,7 @@ double getLongitude() {
   return d_lon;
 }
 
-float getAccuracy() {
+float getHorizontalAccuracy() {
   float f_accuracy;
   uint32_t accuracy = myGNSS.getHorizontalAccuracy();
   // Convert the horizontal accuracy (mm * 10^-1) to a float
@@ -919,14 +870,83 @@ float getHeightOverSeaLevel() {
   return f_msl;
 }
 
+bool saveCurrentLocation() {
+    int32_t latitude = myGNSS.getHighResLatitude();
+    int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
+    int32_t longitude = myGNSS.getHighResLongitude();
+    int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
+    int32_t elipsoid = myGNSS.getElipsoid();
+    int8_t elipsoidHp = myGNSS.getElipsoidHp();
+    // int32_t msl = myGNSS.getMeanSeaLevel();
+    // int8_t mslHp = myGNSS.getMeanSeaLevelHp();
+    float hAccuracy = getHorizontalAccuracy();
+
+    DEBUG_SERIAL.print("elipsoid: ");DEBUG_SERIAL.print(elipsoid);
+    DEBUG_SERIAL.print(", elipsoidHp: ");DEBUG_SERIAL.println(elipsoidHp);
+    // DEBUG_SERIAL.print("msl: ");DEBUG_SERIAL.print(msl);
+    // DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
+    DEBUG_SERIAL.print("horizontal Acc.: ");DEBUG_SERIAL.println(hAccuracy);
+    
+
+    bool success = true;
+    String csvStr = String(latitude) + SEP + String(latitudeHp);
+    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LATITUDE, csvStr.c_str());
+    csvStr = String(longitude) + SEP + String(longitudeHp);
+    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE, csvStr.c_str());
+    // csvStr = String(msl) + SEP + String(mslHp); // Mean sea level
+    csvStr = String(elipsoid) + SEP + String(elipsoidHp); // Elipsoid height
+    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
+    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_COORD_ACCURACY, String(hAccuracy, 4).c_str());
+    return success;
+}
+
+void displaySavedLocation(location_t* loc) {
+  if (displayConnected) {
+    display.clearDisplay();
+
+    display.setCursor(0, 0);
+    display.print(F("SSID: "));
+    display.print(WiFi.SSID());
+
+    display.setCursor(0, 10);
+    display.print(F("IP: "));
+    display.print(WiFi.localIP());
+
+    display.setCursor(0, 20);
+    display.print(F("Lat: "));
+    double lat = getDoubleCoordFromIntegerParts(loc->lat, loc->lat_hp);
+    display.print(lat, 9);
+    display.print(F(" deg"));
+
+    display.setCursor(0, 30);
+    display.print("Lon: ");
+    double lon = getDoubleCoordFromIntegerParts(loc->lon, loc->lon_hp);
+    display.print(lon, 9);
+    display.print(F(" deg"));
+
+    display.setCursor(0, 40);
+    display.print("Altitude: ");
+    float alt = getFloatAltFromIntegerParts(loc->alt, loc->alt_hp);
+    display.print(alt, 3); 
+    display.print(F(" m"));
+
+    display.setCursor(0, 50);
+    display.print(F("hAcc: "));
+    display.print(readFile(SPIFFS, PATH_RTK_LOCATION_COORD_ACCURACY));
+    display.print(F(" m   "));
+    display.display();
+  } else {
+    DEBUG_SERIAL.println(F("No display connected"));
+  }
+}
+
 bool setStaticLocationFromSPIFFS() {
   location_t baseLoc;
   getLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY);
   printLocation(&baseLoc);
   bool response = true;
-  // TODO: This is not right: (int32_t)(baseLoc.alt/10)
   // response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, baseLoc.alt_hp, true); 
-  response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10), (int8_t)(baseLoc.alt%10)+ baseLoc.alt_hp, true); 
+  response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10) /* cm */, (int8_t)((baseLoc.alt%10)*10) + baseLoc.alt_hp /* 0.1 mm*/, true); 
   // response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
   // Or use Earth-centered coordinates:
   //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
