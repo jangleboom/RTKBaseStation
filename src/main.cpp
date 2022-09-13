@@ -619,7 +619,7 @@ void task_rtk_server_connection(void *pvParameters) {
           DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
 
           // Save location automatically, but this is not longtime tested, it can lead to accumulating biases
-          if (AUTO_SAVE_LOCATION && lastAccuracy > accuracy) {
+          if (AUTO_SAVE_LOCATION && (lastAccuracy > accuracy)) {
             if (saveCurrentLocation()) {
               DEBUG_SERIAL.println(F("Location updated, saved to file."));
               lastAccuracy = accuracy;
