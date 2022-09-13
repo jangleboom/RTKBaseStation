@@ -49,6 +49,8 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 // #define RTK_SCL_PIN                 32
 #define I2C_FREQUENCY_100K            100000  // 100 kHz
 #define I2C_FREQUENCY_400K            400000  // 400 kHz
+#define AUTO_SAVE_LOCATION            false   /* Save location automatically, \
+but this is not longtime tested, it could lead to accumulating biases */
 
 /*******************************************************************************
  *                         Oled

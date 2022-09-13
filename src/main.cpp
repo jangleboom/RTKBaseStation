@@ -618,19 +618,20 @@ void task_rtk_server_connection(void *pvParameters) {
           static float lastAccuracy = 999.;
           DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
 
-          // if (lastAccuracy > accuracy) {
-          //   if (saveCurrentLocation()) {
-          //     DEBUG_SERIAL.println(F("Location updated, saved to file."));
-          //     lastAccuracy = accuracy;
-          //     // Send saved values to RTK2 device
-          //     if (setStaticLocationFromSPIFFS()) {
-          //       // Be sure this values are used after reboot
-          //       setLocationMethodCoords();  
-          //     }
-          //   } else {
-          //     DEBUG_SERIAL.println(F("Error saving location"));
-          //   }
-          // } 
+          // Save location automatically, but this is not longtime tested, it can lead to accumulating biases
+          if (AUTO_SAVE_LOCATION && lastAccuracy > accuracy) {
+            if (saveCurrentLocation()) {
+              DEBUG_SERIAL.println(F("Location updated, saved to file."));
+              lastAccuracy = accuracy;
+              /* Send saved values to RTK2 device */
+              if (setStaticLocationFromSPIFFS()) {
+               /* Be sure that this values are used after reboot */
+                setLocationMethodCoords();  
+              }
+            } else {
+              DEBUG_SERIAL.println(F("Error saving location"));
+            }
+          } 
           
           // Show location data
           if (displayConnected ) {
