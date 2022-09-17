@@ -125,7 +125,8 @@ void task_rtk_server_connection(void *pvParameters);
 // Help funcs
 String secondsToTimeFormat(uint32_t sec);
 
-void setup() {
+void setup() 
+{
   Wire.begin();
   #ifdef DEBUGGING
   Serial.begin(BAUD);
@@ -136,7 +137,8 @@ void setup() {
   
   // Initialize SPIFFS, set true for formatting (at first time running is a must)
   bool format = false;
-  if (!setupSPIFFS(format)) {
+  if (!setupSPIFFS(format)) 
+  {
     DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing"));
     while (true) {};
   }
@@ -147,7 +149,8 @@ void setup() {
   DEBUG_SERIAL.print(F("Location method: ")); DEBUG_SERIAL.println(locationMethod);
   
   location_t lastLocation;
-  if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) {
+  if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) 
+  {
     printLocation(&lastLocation);
   } else {
     DEBUG_SERIAL.println(F("No valid location found in SPIFFS"));
@@ -166,7 +169,8 @@ void setup() {
   DEBUG_SERIAL.println(thisBoard);
 }
 
-void loop() {
+void loop() 
+{
     // #ifdef DEBUGGING
     // DEBUG_SERIAL.println(F("Running Tests..."));
     // aunit::TestRunner::run();
@@ -178,13 +182,15 @@ void loop() {
  *                                 Wifi
  * ****************************************************************************/
 
-void setupWifi() {
+void setupWifi() 
+{
   WiFi.setHostname(DEVICE_NAME);
   // Check if we have credentials for a available network
   String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
   String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
 
-  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
+  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) 
+  {
     setupAPMode(AP_SSID, AP_PASSWORD);
     delay(500);
   } else {
@@ -198,16 +204,19 @@ void setupWifi() {
  *                                 RTK
  * ****************************************************************************/
 
-float getDesiredSurveyAccuracy(const char* path) {
+float getDesiredSurveyAccuracy(const char* path) 
+{
   String savedAccuray = readFile(SPIFFS, path);
-  if (savedAccuray.isEmpty()) {
+  if (savedAccuray.isEmpty()) 
+  {
     return DESIRED_ACCURACY_M;
   } else {
     return savedAccuray.toFloat();
   }
 }
 
-void runSurvey(float desiredAccuracyInM, bool resp) {
+void runSurvey(float desiredAccuracyInM, bool resp) 
+{
     //Alternatively to setting a static position, you could do a survey-in
     // but it takes much longer to start generating RTCM data. See Example4_BaseWithLCD
     // Check if Survey is in Progress before initiating one
@@ -220,8 +229,9 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     if (response == false)
     {
       DEBUG_SERIAL.println(F("Failed to get Survey In status. Freezing."));
-      while (true) {
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+      while (true) 
+      { 
+        vTaskDelay(1000/portTICK_PERIOD_MS); 
       }; //Freeze
     }
 
@@ -236,7 +246,8 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     {
       const String status = "Survey start failed.";
       DEBUG_SERIAL.println(status); DEBUG_SERIAL.println(F("Freezing..."));
-      if (displayConnected) {
+      if (displayConnected) 
+      {
         display.clearDisplay();
         display.setCursor(0, 0);
         display.print(DEVICE_NAME);
@@ -247,8 +258,9 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
         display.display();
       }
   
-      while (true) {
-        delay(1000);
+      while (true) 
+      { 
+        delay(1000); 
       };
     }
     DEBUG_SERIAL.print(F("Survey started. This will run until 60s has passed and less than "));
@@ -273,7 +285,8 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
         DEBUG_SERIAL.print(F(" Accuracy: "));
         DEBUG_SERIAL.println(meanAccuracy); 
 
-        if (displayConnected) {
+        if (displayConnected) 
+        {
           display.clearDisplay();
           display.setCursor(0, 0);
           display.print(F("SSID: "));
@@ -281,7 +294,8 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
           display.setCursor(0, 10);
           display.print(F("IP: "));
           display.print(WiFi.localIP());
-          if (WiFi.isConnected()) {
+          if (WiFi.isConnected()) 
+          {
             display.setCursor(0, 20);
             display.print(F("http://"));display.print(DEVICE_NAME);display.print(F(".local"));
           }
@@ -322,12 +336,15 @@ void runSurvey(float desiredAccuracyInM, bool resp) {
     // 
 }
 
-void setupRTKBase(bool surveyEnabled) {
-  if (myGNSS.begin(Wire) == false) {
+void setupRTKBase(bool surveyEnabled) 
+{
+  if (myGNSS.begin(Wire) == false) 
+  {
     DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
-    while (true) {
-        delay(1000);
-        }
+    while (true) 
+    { 
+      delay(1000); 
+    }
   }
 
   myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_RTCM3 | COM_TYPE_NMEA);  //UBX+RTCM3 is not a valid option so we enable all three.
@@ -344,11 +361,13 @@ void setupRTKBase(bool surveyEnabled) {
   response &= myGNSS.disableNMEAMessage(UBX_NMEA_GLL, COM_PORT_I2C);
   response &= myGNSS.disableNMEAMessage(UBX_NMEA_VTG, COM_PORT_I2C);
 
-  if (response == false) {
+  if (response == false) 
+  {
     DEBUG_SERIAL.println(F("Failed to disable NMEA. Freezing..."));
-    while (true) {
-        delay(1000);
-      }
+    while (true) 
+    {
+      delay(1000);
+    }
   } else
     DEBUG_SERIAL.println(F("NMEA disabled"));
 
@@ -360,19 +379,25 @@ void setupRTKBase(bool surveyEnabled) {
   response &= myGNSS.enableRTCMmessage(UBX_RTCM_1124, COM_PORT_I2C, 1);
   response &= myGNSS.enableRTCMmessage(UBX_RTCM_1230, COM_PORT_I2C, 10);  //Enable message every 10 seconds
 
-  if (response == false) {
+  if (response == false) 
+  {
     DEBUG_SERIAL.println(F("Failed to enable RTCM. Freezing..."));
-    while (true) {
+    while (true) 
+    { 
       delay(1000);
     }
-  } else
-    DEBUG_SERIAL.println(F("RTCM sentences enabled"));
+  } else 
+  { 
+    DEBUG_SERIAL.println(F("RTCM sentences enabled")); 
+  }
 
   // Did you entered high precision location data into the web form?
-  if (!surveyEnabled) {
+  if (!surveyEnabled) 
+  {
     // Latitude, Longitude, Altitude input:
     setStaticLocationFromSPIFFS();
-  } else {
+  } else 
+  {
     // Read safed target accuracy from SPIFFS
     float desiredAcc = getDesiredSurveyAccuracy(PATH_RTK_LOCATION_SURVEY_ACCURACY);
     // Start survey-in
@@ -390,11 +415,13 @@ void setupRTKBase(bool surveyEnabled) {
 // This function gets called from the SparkFun u-blox Arduino Library.
 // As each RTCM byte comes in you can specify what to do with it
 // Useful for passing the RTCM correction data to a radio, Ntrip broadcaster, etc.
-void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
-    if (ntripCaster.connected() == true) {
-      ntripCaster.write(incoming);  //Send this byte to socket
-      serverBytesSent++;
-      lastSentRTCM_ms = millis();
+void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) 
+{
+  if (ntripCaster.connected() == true) 
+  {
+    ntripCaster.write(incoming);  //Send this byte to socket
+    serverBytesSent++;
+    lastSentRTCM_ms = millis();
   }
 }
 
@@ -402,7 +429,8 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming) {
  *                                 FreeRTOS
  * ****************************************************************************/
 
-void task_rtk_server_connection(void *pvParameters) {
+void task_rtk_server_connection(void *pvParameters) 
+{
     (void)pvParameters;
 
     Wire.setClock(I2C_FREQUENCY_100K);
@@ -426,10 +454,12 @@ void task_rtk_server_connection(void *pvParameters) {
     credentialsExists &= !mountPoint.isEmpty();
     credentialsExists &= !mountPointPW.isEmpty();
     
-    while (!credentialsExists) {
+    while (!credentialsExists) 
+    {
       DEBUG_SERIAL.println("RTK Credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
       
-      if (displayConnected) {
+      if (displayConnected) 
+      {
         display.clearDisplay();
         display.setCursor(0,0);
         display.print(F("STOP, enter wifi+rtk"));
@@ -467,18 +497,21 @@ void task_rtk_server_connection(void *pvParameters) {
     DEBUG_SERIAL.printf("task_rtk_server_connection, surveyEnabled: %s\n", startSurvey ? "yes" : "no");
     setupRTKBase(startSurvey);
 
-    while (true) {
+    while (true) 
+    {
       // beginServing() func content from Sparkfun example ZED-F9P/Example4_BaseWithLCD
       
       taskStart:
 
       // First and again: check wifi connection
-      while (!checkConnectionToWifiStation()) {
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+      while (!checkConnectionToWifiStation()) 
+      {
+        vTaskDelay(5000/portTICK_PERIOD_MS);
       }
 
       // Connect if we are not already
-      if (ntripCaster.connected() == false) {
+      if (ntripCaster.connected() == false) 
+      {
           DEBUG_SERIAL.printf("Opening socket to %s\n", CASTER_HOST);
 
         if (ntripCaster.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == true)  // Attempt connection
@@ -499,8 +532,10 @@ void task_rtk_server_connection(void *pvParameters) {
 
             // Wait for response
             unsigned long timeout = millis();
-            while (!ntripCaster.available()) {
-            if (millis() - timeout > 5000) {
+            while (!ntripCaster.available()) 
+            {
+            if (millis() - timeout > 5000) 
+            {
                 DEBUG_SERIAL.println(F("Caster timed out!"));
                 ntripCaster.stop();
                 // TODO: display state and reboot after 5x fails(?)
@@ -512,7 +547,8 @@ void task_rtk_server_connection(void *pvParameters) {
             }
 
             // Check reply
-            while (ntripCaster.available()) {
+            while (ntripCaster.available()) 
+            {
               response[responseSpot++] = ntripCaster.read();
             if (strstr(response, "200") > 0)  // Look for 'ICY 200 OK'
                 connectionSuccess = true;
@@ -521,15 +557,18 @@ void task_rtk_server_connection(void *pvParameters) {
             }
             response[responseSpot] = '\0';
 
-            if (connectionSuccess == false) {
+            if (connectionSuccess == false) 
+            {
                 DEBUG_SERIAL.print(F("Failed to connect to Caster: ")); 
                 DEBUG_SERIAL.println(response);
                 // TODO: display state
-                if (strstr(response, "401") > 0) { // look for "ICY 401 Unauthorized"
-                // if (String(response).equals("ICY 401 Unauthorized")) {
+                // look for "ICY 401 Unauthorized"
+                if (strstr(response, "401") > 0) 
+                { 
                   DEBUG_SERIAL.println("You are banned from rtk2go.com! Freezing");
 
-                  if (displayConnected) {
+                  if (displayConnected) 
+                  {
                     display.clearDisplay();
                     display.setCursor(0,0);
                     display.print("STOP");
@@ -544,7 +583,10 @@ void task_rtk_server_connection(void *pvParameters) {
                     display.setCursor(0,50);
                     display.print("Freezing...");
                   }
-                  while (true) {delay(1000);}
+                  while (true) 
+                  { 
+                    delay(1000);
+                  }
                 }
                 // checkConnectionToWifiStation();
                 vTaskDelay(1000);
@@ -563,19 +605,22 @@ void task_rtk_server_connection(void *pvParameters) {
         lastSentRTCM_ms = millis();
 
         // This is the main sending loop. We scan for new ublox data but processRTCM() is where the data actually gets sent out.
-        while (ntripCaster.connected() == true) {
+        while (ntripCaster.connected() == true) 
+        {
             myGNSS.checkUblox();  //See if new data is available. Process bytes as they come in.
 
             //Close socket if we don't have new data for 10s
             //RTK2Go will ban your IP address if you abuse it. See http://www.rtk2go.com/how-to-get-your-ip-banned/
             //So let's not leave the socket open/hanging without data
-            if (millis() - lastSentRTCM_ms > maxTimeBeforeHangup_ms) {
+            if (millis() - lastSentRTCM_ms > maxTimeBeforeHangup_ms) 
+            {
                 const String status = "RTCM timeout. Disconnecting...";
                 //TODO: display this state
                 DEBUG_SERIAL.println(status);
                 ntripCaster.stop();
 
-                if (displayConnected) {
+                if (displayConnected) 
+                {
                   display.clearDisplay();
                   display.setCursor(0,0);
                   display.print("Timeout ERROR!");
@@ -594,7 +639,8 @@ void task_rtk_server_connection(void *pvParameters) {
         delay(10);
 
         // Report some statistics every 10000
-        if (millis() - lastReport_ms > 10000) {
+        if (millis() - lastReport_ms > 10000) 
+        {
           lastReport_ms += 10000;
           DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
           double lat = getLatitude();
@@ -619,12 +665,15 @@ void task_rtk_server_connection(void *pvParameters) {
           DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
 
           // Save location automatically, but this is not longtime tested, it can lead to accumulating biases
-          if (AUTO_SAVE_LOCATION && (lastAccuracy > accuracy)) {
-            if (saveCurrentLocation()) {
+          if (AUTO_SAVE_LOCATION && (lastAccuracy > accuracy)) 
+          {
+            if (saveCurrentLocation()) 
+            {
               DEBUG_SERIAL.println(F("Location updated, saved to file."));
               lastAccuracy = accuracy;
               /* Send saved values to RTK2 device */
-              if (setStaticLocationFromSPIFFS()) {
+              if (setStaticLocationFromSPIFFS()) 
+              {
                /* Be sure that this values are used after reboot */
                 setLocationMethodCoords();  
               }
@@ -634,7 +683,8 @@ void task_rtk_server_connection(void *pvParameters) {
           } 
           
           // Show location data
-          if (displayConnected ) {
+          if (displayConnected ) 
+          {
             static int8_t displayRefereshCnt = 0;
             displayRefereshCnt++;
             displayRefereshCnt %= 4;
@@ -692,8 +742,10 @@ void task_rtk_server_connection(void *pvParameters) {
  *                              Button(s)
  * ****************************************************************************/
 
-void buttonHandler(Button2 &btn) {
-  if (btn == wipeButton) {
+void buttonHandler(Button2 &btn) 
+{
+  if (btn == wipeButton) 
+  {
     digitalWrite(LED_BUILTIN, HIGH);
     DEBUG_SERIAL.println(F("Wiping WiFi credentials and RTK settings from memory..."));
     wipeSpiffsFiles();
@@ -705,16 +757,19 @@ void buttonHandler(Button2 &btn) {
  *                                Display
  * ****************************************************************************/
 
-bool setupDisplay() {
+bool setupDisplay() 
+{
   displayConnected = false;
-  if (!display.begin(OLED_I2C_ADDR, true)) {
+  if (!display.begin(OLED_I2C_ADDR, true)) 
+  {
     DEBUG_SERIAL.println("Could not find SH110X? Check wiring");
     // while (true) delay(100);
   } else { // Address 0x3C default
     displayConnected = true;
   }
  
-  if (displayConnected) {
+  if (displayConnected) 
+  {
     display.display();
     delay(500);
 
@@ -740,7 +795,8 @@ bool setupDisplay() {
 }
 
 
-String secondsToTimeFormat(uint32_t sec) {  //Time we are converting. This can be passed from another function.
+String secondsToTimeFormat(uint32_t sec) 
+{                                //Time we are converting. This can be passed from another function.
   int hh = sec/3600;             //Number of seconds in an hour
   int mm = (sec-hh*3600)/60;     //Remove the number of hours and calculate the minutes.
   int ss = sec-hh*3600-mm*60;    //Remove the number of hours and minutes, leaving only seconds.
@@ -752,7 +808,8 @@ String secondsToTimeFormat(uint32_t sec) {  //Time we are converting. This can b
   return hhMmmSs;
 }
 
-void printPositionAndAccuracy() {
+void printPositionAndAccuracy() 
+{
     // getHighResLatitude: returns the latitude from HPPOSLLH as an int32_t in degrees * 10^-7
     // getHighResLatitudeHp: returns the high resolution component of latitude from HPPOSLLH as an int8_t in degrees * 10^-9
     // getHighResLongitude: returns the longitude from HPPOSLLH as an int32_t in degrees * 10^-7
@@ -821,7 +878,8 @@ void printPositionAndAccuracy() {
     DEBUG_SERIAL.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
 }
 
-double getLatitude() {
+double getLatitude() 
+{
   int32_t latitude = myGNSS.getHighResLatitude();
   int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
   double d_lat; // latitude
@@ -834,7 +892,8 @@ double getLatitude() {
   return d_lat;
 }
 
-double getLongitude() {
+double getLongitude() 
+{
   int32_t longitude = myGNSS.getHighResLongitude();
   int8_t longitudeHp = myGNSS.getHighResLongitudeHp();
   double d_lon; // longitude
@@ -846,7 +905,8 @@ double getLongitude() {
   return d_lon;
 }
 
-float getHorizontalAccuracy() {
+float getHorizontalAccuracy() 
+{
   float f_accuracy;
   uint32_t accuracy = myGNSS.getHorizontalAccuracy();
   // Convert the horizontal accuracy (mm * 10^-1) to a float
@@ -857,7 +917,8 @@ float getHorizontalAccuracy() {
   return f_accuracy;
 }
 
-float getHeightOverSeaLevel() {
+float getHeightOverSeaLevel() 
+{
   float f_msl;
   int32_t msl = myGNSS.getMeanSeaLevel();
   int8_t mslHp = myGNSS.getMeanSeaLevelHp();
@@ -871,7 +932,8 @@ float getHeightOverSeaLevel() {
   return f_msl;
 }
 
-bool saveCurrentLocation() {
+bool saveCurrentLocation() 
+{
     int32_t latitude = myGNSS.getHighResLatitude();
     int8_t latitudeHp = myGNSS.getHighResLatitudeHp();
     int32_t longitude = myGNSS.getHighResLongitude();
@@ -901,8 +963,10 @@ bool saveCurrentLocation() {
     return success;
 }
 
-void displaySavedLocation(location_t* loc) {
-  if (displayConnected) {
+void displaySavedLocation(location_t* loc) 
+{
+  if (displayConnected) 
+  {
     display.clearDisplay();
 
     display.setCursor(0, 0);
@@ -941,7 +1005,8 @@ void displaySavedLocation(location_t* loc) {
   }
 }
 
-bool setStaticLocationFromSPIFFS() {
+bool setStaticLocationFromSPIFFS() 
+{
   location_t baseLoc;
   getLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY);
   printLocation(&baseLoc);
@@ -951,14 +1016,14 @@ bool setStaticLocationFromSPIFFS() {
   // response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
   // Or use Earth-centered coordinates:
   //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
-  if (response == false) {
+  if (response == false) 
+  {
     DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
-    while (true) {
+    while (true) 
+    {
       delay(1000);
     }
-  } else {
-    DEBUG_SERIAL.println(F("Static position set"));
-  }
+  } else { DEBUG_SERIAL.println(F("Static position set")); }
 
   return response;
 }
