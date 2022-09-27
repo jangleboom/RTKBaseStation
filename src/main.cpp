@@ -117,20 +117,91 @@ long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox m
 // Globals
 SFE_UBLOX_GNSS myGNSS;
 
+/**
+ * @brief GNSS module setup
+ * 
+ * @param surveyEnabled If true a survey will be started
+ */
 void setupRTKBase(bool surveyEnabled);
+/**
+ * @brief Get the Desired Survey Accuracy value
+ * 
+ * @param path Path to the saved target accuracy value
+ * @return float Saved target accuracy value
+ */
 float getDesiredSurveyAccuracy(const char* path);
+/**
+ * @brief Run a survey to get locataion of this station
+ * 
+ * @param desiredAccuracyInM  If this value is reached, the survey stops and the module starts sending
+ *                            data to the caster server
+ * @param resp Response from whole GNSS setup process
+ */
 void runSurvey(float desiredAccuracyInM, bool resp);
+/**
+ * @brief Get the Longitude 
+ * 
+ * @return double Longitude
+ */
 double getLongitude(void);
+/**
+ * @brief Get the Latitude 
+ * 
+ * @return double Latitude
+ */
 double getLatitude(void);
+/**
+ * @brief Get the Height Over Sea Level as float
+ * 
+ * @return float Height Over Sea Level
+ */
 float getHeightOverSeaLevel(void);
+/**
+ * @brief Get the Horizontal Accuracy as float
+ * 
+ * @return float Horizontal Accuracy
+ */
 float getHorizontalAccuracy(void);
+/**
+ * @brief Func to save the location, but its not recommended to use this values for 
+ *        setStationPosition func of in the Sparkfun lib, use better more accurate values
+ * 
+ * @return true If saving to SPIFFS was successful
+ * @return false If saving to SPIFFS failed
+ */
 bool saveCurrentLocation(void);
+/**
+ * @brief Func to use the saved location as static position, these value should be entered and
+ *        saved via the web form and should be high precision coordinates too
+ * 
+ * @return true If it was successful
+ * @return false If it failed
+ */
 bool setStaticLocationFromSPIFFS(void);
+/**
+ * @brief Print your current location with horizontal accuracy
+ * 
+ */
 void printPositionAndAccuracy(void);
+/**
+ * @brief Show location on oled display
+ * 
+ * @param loc Location to show
+ */
 void displaySavedLocation(location_t* loc);
+/**
+ * @brief Task for sending data to rtk2go server
+ * 
+ * @param pvParameters Void pointer, no parameter used here
+ */
 void task_rtk_server_connection(void *pvParameters);
 
-// Help funcs
+/**
+ * @brief Help func to show time in readable format
+ * 
+ * @param sec Time in seconds
+ * @return String Formatted time String
+ */
 String secondsToTimeFormat(uint32_t sec);
 
 void setup() 
@@ -151,7 +222,7 @@ void setup()
     while (true) {};
   }
 
-  DEBUG_SERIAL.print(F("Device name: "));DEBUG_SERIAL.println(DEVICE_NAME);
+  DEBUG_SERIAL.print(F("Device name: "));DEBUG_SERIAL.println(DEVICE_TYPE);
 
   String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
   DEBUG_SERIAL.print(F("Location method: ")); DEBUG_SERIAL.println(locationMethod);
@@ -193,7 +264,7 @@ void loop()
 */
 void setupWifi() 
 {
-  WiFi.setHostname(DEVICE_NAME);
+  WiFi.setHostname(DEVICE_TYPE);
   // Check if we have credentials for a available network
   String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
   String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
@@ -203,7 +274,7 @@ void setupWifi()
     setupAPMode(AP_SSID, AP_PASSWORD);
     delay(500);
   } else {
-   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
+   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_TYPE);
    delay(500);
  }
   startServer(&server);
@@ -260,7 +331,7 @@ void runSurvey(float desiredAccuracyInM, bool resp)
       {
         display.clearDisplay();
         display.setCursor(0, 0);
-        display.print(DEVICE_NAME);
+        display.print(DEVICE_TYPE);
         display.setCursor(0, 20);
         display.print(status);
         display.setCursor(0, 40);
@@ -307,7 +378,7 @@ void runSurvey(float desiredAccuracyInM, bool resp)
           if (WiFi.isConnected()) 
           {
             display.setCursor(0, 20);
-            display.print(F("http://"));display.print(DEVICE_NAME);display.print(F(".local"));
+            display.print(F("http://"));display.print(DEVICE_TYPE);display.print(F(".local"));
           }
           display.setCursor(0, 30);
           display.print(F("Survey: "));
@@ -636,7 +707,7 @@ void task_rtk_server_connection(void *pvParameters)
                   display.setCursor(0,0);
                   display.print("Timeout ERROR!");
                   display.setCursor(0,10);
-                  display.print(DEVICE_NAME);
+                  display.print(DEVICE_TYPE);
                   display.print(", hang up!");
                   display.setCursor(0,20);
                   display.print("ntripCaster stopped");
@@ -797,7 +868,7 @@ bool setupDisplay()
     display.print(F("   from"));
     display.setCursor(0,40);
     display.print(F("  "));
-    display.print(DEVICE_NAME);
+    display.print(DEVICE_TYPE);
     display.display();
     display.setTextSize(1);
     
@@ -944,6 +1015,7 @@ float getHeightOverSeaLevel()
 
   return f_msl;
 }
+
 
 bool saveCurrentLocation() 
 {
