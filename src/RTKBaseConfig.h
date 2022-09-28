@@ -6,44 +6,32 @@
 #undef ESP_ERROR_CHECK
 #define ESP_ERROR_CHECK(x)   do { esp_err_t rc = (x); if (rc != ESP_OK) { ESP_LOGE("err", "esp_err_t = %d", rc); assert(0 && #x);} } while(0);
 
-/******************************************************************************/
-//                       Default Serial settings
-/******************************************************************************/
+/*
+=================================================================================
+                            Serial settings
+=================================================================================
+*/
 //set to true for debug output, false for no debug output
 #define DEBUGGING true
-#define DEBUG_SERIAL \
+#define DBG \
   if (DEBUGGING) Serial
 
 #define BAUD                          115200
-// #define TESTING
 
-
-/*******************************************************************************
- *                         SPIFFS 
- * ****************************************************************************/
-
-/*******************************************************************************
- *                         WiFi settings
- * ****************************************************************************/
+/*
+=================================================================================
+                              WiFi settings
+=================================================================================
+*/
 const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
-// /**
-//  * @brief Get the Device Name object
-//  * 
-//  * @return String Device Name
-//  */
-// String getDeviceName(const String &);
 
-// /**
-//  * @brief Get the Chip Id object
-//  * 
-//  * @return uint32_t Chip Id
-//  */
-// uint32_t getChipId(void);
-#define DEVICE_NAME "rtkbase"
-
-/*******************************************************************************
- *                         Default RTK settings 
- * ****************************************************************************/
+/*
+=================================================================================
+                              RTK settings
+=================================================================================
+*/
+#define COORD_PRECISION               9
+#define ALT_PRECISION                 4
 #define RTK_I2C_ADDR                  0x42
 // #define RTK_SDA_PIN                 33
 // #define RTK_SCL_PIN                 32
@@ -52,9 +40,11 @@ const uint8_t MAX_SSIDS = 10; // Space to scan and remember SSIDs
 #define AUTO_SAVE_LOCATION            false   /* Save location automatically, \
 but this is not longtime tested, it could lead to accumulating biases */
 
-/*******************************************************************************
- *                         Oled
- * ****************************************************************************/
+/*
+=================================================================================
+                              Oled settings
+=================================================================================
+*/
 #define OLED_I2C_ADDR 0x3c
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
 #define SCREEN_HEIGHT 64  // OLED display height, in pixels
@@ -62,9 +52,11 @@ but this is not longtime tested, it could lead to accumulating biases */
 // #define SCL_PIN 5
 #define OLED_RESET -1   //   QT-PY / XIAO
 
-/*******************************************************************************
- *                         FreeRTOS
- * ****************************************************************************/
+/*
+=================================================================================
+                          FreeRTOS settings
+=================================================================================
+*/
 #define RUNNING_CORE_0                0  // Low level WiFi code runs on core 0
 #define RUNNING_CORE_1                1  // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 

@@ -85,9 +85,10 @@ void buttonHandler(Button2 &btn);
                                 WiFi
 =================================================================================
 */
+#include <WiFi.h>
 #include <SPIFFS.h>
 #include <RTKBaseManager.h>
-#include <WiFi.h>
+#include <TestsRTKBaseStation.h>
 
 using namespace RTKBaseManager;
 AsyncWebServer server(80);
@@ -218,21 +219,21 @@ void setup()
   bool format = false;
   if (!setupSPIFFS(format)) 
   {
-    DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing"));
+    DBG.println(F("setupSPIFFS failed, freezing"));
     while (true) {};
   }
 
-  DEBUG_SERIAL.print(F("Device name: "));DEBUG_SERIAL.println(DEVICE_TYPE);
+  DBG.print(F("Device name: ")); DBG.println(DEVICE_NAME);
 
   String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
-  DEBUG_SERIAL.print(F("Location method: ")); DEBUG_SERIAL.println(locationMethod);
+  DBG.print(F("Location method: ")); DBG.println(locationMethod);
   
   location_t lastLocation;
   if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) 
   {
     printLocation(&lastLocation);
   } else {
-    DEBUG_SERIAL.println(F("No valid location found in SPIFFS"));
+    DBG.println(F("No valid location found in SPIFFS"));
   }
 
   wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set here too  
@@ -244,16 +245,16 @@ void setup()
   xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_PRIORITY, NULL, RUNNING_CORE_0);
 
   String thisBoard = ARDUINO_BOARD;
-  DEBUG_SERIAL.print(F("Setup done on "));
-  DEBUG_SERIAL.println(thisBoard);
+  DBG.print(F("Setup done on "));
+  DBG.println(thisBoard);
 }
 
 void loop() 
 {
-    // #ifdef DEBUGGING
-    // DEBUG_SERIAL.println(F("Running Tests..."));
-    // aunit::TestRunner::run();
-    // #endif
+    #ifdef DEBUGGING
+    DBG.println(F("Running Tests..."));
+    aunit::TestRunner::run();
+    #endif
     wipeButton.loop();
 }
 
@@ -264,17 +265,17 @@ void loop()
 */
 void setupWifi() 
 {
-  WiFi.setHostname(DEVICE_TYPE);
+  WiFi.setHostname(DEVICE_NAME);
   // Check if we have credentials for a available network
   String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
   String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
 
   if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) 
   {
-    setupAPMode(AP_SSID, AP_PASSWORD);
+    setupAPMode(DEVICE_NAME, AP_PASSWORD);
     delay(500);
   } else {
-   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_TYPE);
+   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
    delay(500);
  }
   startServer(&server);
@@ -309,7 +310,7 @@ void runSurvey(float desiredAccuracyInM, bool resp)
     response &= myGNSS.getSurveyStatus(2000); // Query module for SVIN status with 2000ms timeout (request can take a long time)
     if (response == false)
     {
-      DEBUG_SERIAL.println(F("Failed to get Survey In status. Freezing."));
+      DBG.println(F("Failed to get Survey In status. Freezing."));
       while (true) 
       { 
         vTaskDelay(1000/portTICK_PERIOD_MS); 
@@ -326,12 +327,12 @@ void runSurvey(float desiredAccuracyInM, bool resp)
     if (response == false)
     {
       const String status = "Survey start failed.";
-      DEBUG_SERIAL.println(status); DEBUG_SERIAL.println(F("Freezing..."));
+      DBG.println(status); DBG.println(F("Freezing..."));
       if (displayConnected) 
       {
         display.clearDisplay();
         display.setCursor(0, 0);
-        display.print(DEVICE_TYPE);
+        display.print(DEVICE_NAME);
         display.setCursor(0, 20);
         display.print(status);
         display.setCursor(0, 40);
@@ -344,9 +345,9 @@ void runSurvey(float desiredAccuracyInM, bool resp)
         delay(1000); 
       };
     }
-    DEBUG_SERIAL.print(F("Survey started. This will run until 60s has passed and less than "));
-    DEBUG_SERIAL.print(desiredAccuracyInM);
-    DEBUG_SERIAL.println(F(" m achieved."));
+    DBG.print(F("Survey started. This will run until 60s has passed and less than "));
+    DBG.print(desiredAccuracyInM);
+    DBG.println(F(" m achieved."));
 
     // Begin waiting for survey to complete
     while (myGNSS.getSurveyInValid() == false) // Call the helper function
@@ -361,10 +362,10 @@ void runSurvey(float desiredAccuracyInM, bool resp)
         uint32_t timeElapsed = myGNSS.getSurveyInObservationTime();
         float meanAccuracy = myGNSS.getSurveyInMeanAccuracy();
 
-        DEBUG_SERIAL.print(F("Time elapsed: "));
-        DEBUG_SERIAL.print(secondsToTimeFormat(timeElapsed)); 
-        DEBUG_SERIAL.print(F(" Accuracy: "));
-        DEBUG_SERIAL.println(meanAccuracy); 
+        DBG.print(F("Time elapsed: "));
+        DBG.print(secondsToTimeFormat(timeElapsed)); 
+        DBG.print(F(" Accuracy: "));
+        DBG.println(meanAccuracy); 
 
         if (displayConnected) 
         {
@@ -378,7 +379,7 @@ void runSurvey(float desiredAccuracyInM, bool resp)
           if (WiFi.isConnected()) 
           {
             display.setCursor(0, 20);
-            display.print(F("http://"));display.print(DEVICE_TYPE);display.print(F(".local"));
+            display.print(F("http://"));display.print(DEVICE_NAME);display.print(F(".local"));
           }
           display.setCursor(0, 30);
           display.print(F("Survey: "));
@@ -397,17 +398,17 @@ void runSurvey(float desiredAccuracyInM, bool resp)
       }
 
       else {
-        DEBUG_SERIAL.println(F("SVIN request failed"));
+        DBG.println(F("SVIN request failed"));
       }
 
       delay(1000);
     }
     
-    DEBUG_SERIAL.println(F("Survey valid!"));
-    DEBUG_SERIAL.println(F("Accuracy: "));
-    DEBUG_SERIAL.print(myGNSS.getSurveyInMeanAccuracy()); 
-    DEBUG_SERIAL.println(F(" m"));
-    DEBUG_SERIAL.println(F("Base survey complete! RTCM now broadcasting."));
+    DBG.println(F("Survey valid!"));
+    DBG.println(F("Accuracy: "));
+    DBG.print(myGNSS.getSurveyInMeanAccuracy()); 
+    DBG.println(F(" m"));
+    DBG.println(F("Base survey complete! RTCM now broadcasting."));
 
   
 
@@ -421,7 +422,7 @@ void setupRTKBase(bool surveyEnabled)
 {
   if (myGNSS.begin(Wire) == false) 
   {
-    DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
+    DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
     while (true) 
     { 
       delay(1000); 
@@ -444,13 +445,13 @@ void setupRTKBase(bool surveyEnabled)
 
   if (response == false) 
   {
-    DEBUG_SERIAL.println(F("Failed to disable NMEA. Freezing..."));
+    DBG.println(F("Failed to disable NMEA. Freezing..."));
     while (true) 
     {
       delay(1000);
     }
   } else
-    DEBUG_SERIAL.println(F("NMEA disabled"));
+    DBG.println(F("NMEA disabled"));
 
   //Enable necessary RTCM sentences
   response &= myGNSS.enableRTCMmessage(UBX_RTCM_1005, COM_PORT_I2C, 1);  //Enable message 1005 to output through UART2, message every second
@@ -462,14 +463,14 @@ void setupRTKBase(bool surveyEnabled)
 
   if (response == false) 
   {
-    DEBUG_SERIAL.println(F("Failed to enable RTCM. Freezing..."));
+    DBG.println(F("Failed to enable RTCM. Freezing..."));
     while (true) 
     { 
       delay(1000);
     }
   } else 
   { 
-    DEBUG_SERIAL.println(F("RTCM sentences enabled")); 
+    DBG.println(F("RTCM sentences enabled")); 
   }
 
   // Did you entered high precision location data into the web form?
@@ -489,7 +490,7 @@ void setupRTKBase(bool surveyEnabled)
   after running look here for your mountpoint: http://new.rtk2go.com:2101/SNIP::STATUS
 */
 
-  DEBUG_SERIAL.println(F("Module configuration complete"));
+  DBG.println(F("Module configuration complete"));
   // TODO: display settings
 }
 
@@ -538,7 +539,7 @@ void task_rtk_server_connection(void *pvParameters)
     
     while (!credentialsExists) 
     {
-      DEBUG_SERIAL.println("RTK Credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
+      DBG.println("RTK Credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
       
       if (displayConnected) 
       {
@@ -551,7 +552,7 @@ void task_rtk_server_connection(void *pvParameters)
         display.print(F("Go to access point: "));
         display.setCursor(0,30);
         display.print(F("SSID: "));
-        display.print(AP_SSID);
+        display.print(DEVICE_NAME);
         display.setCursor(0,40);
         display.print(F("PW: "));
         display.print(AP_PASSWORD);
@@ -576,7 +577,7 @@ void task_rtk_server_connection(void *pvParameters)
                       longitude.isEmpty() || \
                       altitude.isEmpty();
 
-    DEBUG_SERIAL.printf("task_rtk_server_connection, surveyEnabled: %s\n", startSurvey ? "yes" : "no");
+    DBG.printf("task_rtk_server_connection, surveyEnabled: %s\n", startSurvey ? "yes" : "no");
     setupRTKBase(startSurvey);
 
     while (true) 
@@ -594,11 +595,11 @@ void task_rtk_server_connection(void *pvParameters)
       // Connect if we are not already
       if (ntripCaster.connected() == false) 
       {
-          DEBUG_SERIAL.printf("Opening socket to %s\n", CASTER_HOST);
+          DBG.printf("Opening socket to %s\n", CASTER_HOST);
 
         if (ntripCaster.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == true)  // Attempt connection
         {
-            DEBUG_SERIAL.printf("Connected to %s:%d\n", casterHost.c_str(), (uint16_t)casterPort.toInt());
+            DBG.printf("Connected to %s:%d\n", casterHost.c_str(), (uint16_t)casterPort.toInt());
 
             const int SERVER_BUFFER_SIZE = 512;
             char serverRequest[SERVER_BUFFER_SIZE];
@@ -608,8 +609,8 @@ void task_rtk_server_connection(void *pvParameters)
                     "SOURCE %s /%s\r\nSource-Agent: NTRIP SparkFun u-blox Server v1.0\r\n\r\n",
                     mountPointPW.c_str(), mountPoint.c_str());
 
-            DEBUG_SERIAL.println(F("Sending server request:"));
-            DEBUG_SERIAL.println(serverRequest);
+            DBG.println(F("Sending server request:"));
+            DBG.println(serverRequest);
             ntripCaster.write(serverRequest, strlen(serverRequest));
 
             // Wait for response
@@ -618,10 +619,10 @@ void task_rtk_server_connection(void *pvParameters)
             {
             if (millis() - timeout > 5000) 
             {
-                DEBUG_SERIAL.println(F("Caster timed out!"));
+                DBG.println(F("Caster timed out!"));
                 ntripCaster.stop();
                 // TODO: display state and reboot after 5x fails(?)
-                DEBUG_SERIAL.println(F("Make a break of 10 s to not get banned, and retry"));
+                DBG.println(F("Make a break of 10 s to not get banned, and retry"));
                 vTaskDelay(10000/portTICK_PERIOD_MS);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
@@ -641,13 +642,13 @@ void task_rtk_server_connection(void *pvParameters)
 
             if (connectionSuccess == false) 
             {
-                DEBUG_SERIAL.print(F("Failed to connect to Caster: ")); 
-                DEBUG_SERIAL.println(response);
+                DBG.print(F("Failed to connect to Caster: ")); 
+                DBG.println(response);
                 // TODO: display state
                 // look for "ICY 401 Unauthorized"
                 if (strstr(response, "401") > 0) 
                 { 
-                  DEBUG_SERIAL.println("You are banned from rtk2go.com! Freezing");
+                  DBG.println("You are banned from rtk2go.com! Freezing");
 
                   if (displayConnected) 
                   {
@@ -676,7 +677,7 @@ void task_rtk_server_connection(void *pvParameters)
                 }
             }  // End attempt to connect
             else {
-                DEBUG_SERIAL.println(F("Connection to host failed"));
+                DBG.println(F("Connection to host failed"));
 
                 vTaskDelay(10000/portTICK_PERIOD_MS);
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
@@ -698,7 +699,7 @@ void task_rtk_server_connection(void *pvParameters)
             {
                 const String status = "RTCM timeout. Disconnecting...";
                 //TODO: display this state
-                DEBUG_SERIAL.println(status);
+                DBG.println(status);
                 ntripCaster.stop();
 
                 if (displayConnected) 
@@ -707,7 +708,7 @@ void task_rtk_server_connection(void *pvParameters)
                   display.setCursor(0,0);
                   display.print("Timeout ERROR!");
                   display.setCursor(0,10);
-                  display.print(DEVICE_TYPE);
+                  display.print(DEVICE_NAME);
                   display.print(", hang up!");
                   display.setCursor(0,20);
                   display.print("ntripCaster stopped");
@@ -724,34 +725,34 @@ void task_rtk_server_connection(void *pvParameters)
         if (millis() - lastReport_ms > 10000) 
         {
           lastReport_ms += 10000;
-          DEBUG_SERIAL.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
+          DBG.printf("kB sent: %.2f\n", serverBytesSent/1000.0);
           double lat = getLatitude();
           double lon = getLongitude();
         
           // int32_t msl = myGNSS.getMeanSeaLevel();
           // int8_t mslHp = myGNSS.getMeanSeaLevelHp();
-          // DEBUG_SERIAL.print("msl: "); DEBUG_SERIAL.println(msl);
-          // DEBUG_SERIAL.print("mslHp: "); DEBUG_SERIAL.println(mslHp);
+          // DBG.print("msl: "); DBG.println(msl);
+          // DBG.print("mslHp: "); DBG.println(mslHp);
           // float f_msl = getFloatAltFromIntegerParts(msl, mslHp);
-          // DEBUG_SERIAL.print("f_msl: "); DEBUG_SERIAL.println(f_msl);
+          // DBG.print("f_msl: "); DBG.println(f_msl);
 
           int32_t elipsoid = myGNSS.getElipsoid();
           int8_t elipsoidHp = myGNSS.getElipsoidHp();
-          DEBUG_SERIAL.print("elipsoid: "); DEBUG_SERIAL.println(elipsoid);
-          DEBUG_SERIAL.print("elipsoidHp: "); DEBUG_SERIAL.println(elipsoidHp);
+          DBG.print("elipsoid: "); DBG.println(elipsoid);
+          DBG.print("elipsoidHp: "); DBG.println(elipsoidHp);
           float f_elipsoid = getFloatAltFromIntegerParts(elipsoid, elipsoidHp);
-          DEBUG_SERIAL.print("f_elipsoid: "); DEBUG_SERIAL.println(f_elipsoid);
+          DBG.print("f_elipsoid: "); DBG.println(f_elipsoid);
 
           float accuracy = getHorizontalAccuracy();
           static float lastAccuracy = 999.;
-          DEBUG_SERIAL.print("Accuracy: "); DEBUG_SERIAL.println(accuracy, 4);
+          DBG.print("Accuracy: "); DBG.println(accuracy, 4);
 
           // Save location automatically, but this is not longtime tested, it can lead to accumulating biases
           if (AUTO_SAVE_LOCATION && (lastAccuracy > accuracy)) 
           {
             if (saveCurrentLocation()) 
             {
-              DEBUG_SERIAL.println(F("Location updated, saved to file."));
+              DBG.println(F("Location updated, saved to file."));
               lastAccuracy = accuracy;
               /* Send saved values to RTK2 device */
               if (setStaticLocationFromSPIFFS()) 
@@ -760,7 +761,7 @@ void task_rtk_server_connection(void *pvParameters)
                 setLocationMethodCoords();  
               }
             } else {
-              DEBUG_SERIAL.println(F("Error saving location"));
+              DBG.println(F("Error saving location"));
             }
           } 
           
@@ -810,8 +811,8 @@ void task_rtk_server_connection(void *pvParameters)
 
         // Measure stack size (last was 17772)
         uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        DEBUG_SERIAL.print(F("task_rtk_server_connection loop, uxHighWaterMark: "));
-        DEBUG_SERIAL.println(uxHighWaterMark);
+        DBG.print(F("task_rtk_server_connection loop, uxHighWaterMark: "));
+        DBG.println(uxHighWaterMark);
         vTaskDelay(RTK_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
     }
     // Delete self task
@@ -830,7 +831,7 @@ void buttonHandler(Button2 &btn)
   if (btn == wipeButton) 
   {
     digitalWrite(LED_BUILTIN, HIGH);
-    DEBUG_SERIAL.println(F("Wiping WiFi credentials and RTK settings from memory..."));
+    DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
     wipeSpiffsFiles();
     ESP.restart();
   }
@@ -846,7 +847,7 @@ bool setupDisplay()
   displayConnected = false;
   if (!display.begin(OLED_I2C_ADDR, true)) 
   {
-    DEBUG_SERIAL.println("Could not find SH110X? Check wiring");
+    DBG.println("Could not find SH110X? Check wiring");
     // while (true) delay(100);
   } else { // Address 0x3C default
     displayConnected = true;
@@ -868,11 +869,11 @@ bool setupDisplay()
     display.print(F("   from"));
     display.setCursor(0,40);
     display.print(F("  "));
-    display.print(DEVICE_TYPE);
+    display.print(DEVICE_NAME);
     display.display();
     display.setTextSize(1);
     
-    DEBUG_SERIAL.println(F("Display setup done"));
+    DBG.println(F("Display setup done"));
   }
 
   return displayConnected;
@@ -926,10 +927,10 @@ void printPositionAndAccuracy()
     d_lon += ((double)longitudeHp) / 1000000000.0;  // Now add the high resolution component (degrees * 10^-9 )
 
    // Print the lat and lon
-    DEBUG_SERIAL.print("Lat (deg): ");
-    DEBUG_SERIAL.print(d_lat, 9);
-    DEBUG_SERIAL.print(", Lon (deg): ");
-    DEBUG_SERIAL.println(d_lon, 9);
+    DBG.print("Lat (deg): ");
+    DBG.print(d_lat, 9);
+    DBG.print(", Lon (deg): ");
+    DBG.println(d_lon, 9);
 
     // Now define float storage for the heights and accuracy
     float f_elipsoid;
@@ -952,14 +953,14 @@ void printPositionAndAccuracy()
     f_accuracy = f_accuracy / 10000.0; // Convert from mm * 10^-1 to m
 
     // Finally, do the printing
-    DEBUG_SERIAL.print(", elipsoid (m): ");
-    DEBUG_SERIAL.print(f_elipsoid, 3); // Print the elipsoid with 4 decimal places
+    DBG.print(", elipsoid (m): ");
+    DBG.print(f_elipsoid, 3); // Print the elipsoid with 4 decimal places
 
-    DEBUG_SERIAL.print(", Mean Sea Level (m): ");
-    DEBUG_SERIAL.print(f_msl, 4); // Print the mean sea level with 4 decimal places
+    DBG.print(", Mean Sea Level (m): ");
+    DBG.print(f_msl, 4); // Print the mean sea level with 4 decimal places
 
-    DEBUG_SERIAL.print(", Accuracy (m): ");
-    DEBUG_SERIAL.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
+    DBG.print(", Accuracy (m): ");
+    DBG.println(f_accuracy, 4); // Print the accuracy with 4 decimal places
 }
 
 double getLatitude() 
@@ -970,8 +971,8 @@ double getLatitude()
   d_lat = ((double)latitude) / 10000000.0;        // Convert latitude from degrees * 10^-7 to degrees
   d_lat += ((double)latitudeHp) / 1000000000.0;   // Now add the high resolution component (degrees * 10^-9 )
 
-  DEBUG_SERIAL.print("Lat (deg): ");
-  DEBUG_SERIAL.println(d_lat, 9);
+  DBG.print("Lat (deg): ");
+  DBG.println(d_lat, 9);
 
   return d_lat;
 }
@@ -983,8 +984,8 @@ double getLongitude()
   double d_lon; // longitude
   d_lon = ((double)longitude) / 10000000.0; 
   d_lon += ((double)longitudeHp) / 1000000000.0;
-  DEBUG_SERIAL.print("Lon (deg): ");
-  DEBUG_SERIAL.println(d_lon, 9);
+  DBG.print("Lon (deg): ");
+  DBG.println(d_lon, 9);
 
   return d_lon;
 }
@@ -1010,8 +1011,8 @@ float getHeightOverSeaLevel()
   f_msl = (msl * 10) + mslHp;
   // Now convert to m
   f_msl = f_msl / 10000.0; // Convert from mm * 10^-1 to m
-  DEBUG_SERIAL.print("Alt.: ");
-  DEBUG_SERIAL.println(f_msl); // Print the mean sea level with 4 decimal places
+  DBG.print("Alt.: ");
+  DBG.println(f_msl); // Print the mean sea level with 4 decimal places
 
   return f_msl;
 }
@@ -1029,11 +1030,11 @@ bool saveCurrentLocation()
     // int8_t mslHp = myGNSS.getMeanSeaLevelHp();
     float hAccuracy = getHorizontalAccuracy();
 
-    DEBUG_SERIAL.print("elipsoid: ");DEBUG_SERIAL.print(elipsoid);
-    DEBUG_SERIAL.print(", elipsoidHp: ");DEBUG_SERIAL.println(elipsoidHp);
-    // DEBUG_SERIAL.print("msl: ");DEBUG_SERIAL.print(msl);
-    // DEBUG_SERIAL.print(", mslHp: ");DEBUG_SERIAL.println(mslHp);
-    DEBUG_SERIAL.print("horizontal Acc.: ");DEBUG_SERIAL.println(hAccuracy);
+    DBG.print("elipsoid: ");DBG.print(elipsoid);
+    DBG.print(", elipsoidHp: ");DBG.println(elipsoidHp);
+    // DBG.print("msl: ");DBG.print(msl);
+    // DBG.print(", mslHp: ");DBG.println(mslHp);
+    DBG.print("horizontal Acc.: ");DBG.println(hAccuracy);
     
 
     bool success = true;
@@ -1086,7 +1087,7 @@ void displaySavedLocation(location_t* loc)
     display.print(F(" m   "));
     display.display();
   } else {
-    DEBUG_SERIAL.println(F("No display connected"));
+    DBG.println(F("No display connected"));
   }
 }
 
@@ -1103,12 +1104,12 @@ bool setStaticLocationFromSPIFFS()
   //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
   if (response == false) 
   {
-    DEBUG_SERIAL.println(F("Failed to enter static position. Freezing..."));
+    DBG.println(F("Failed to enter static position. Freezing..."));
     while (true) 
     {
       delay(1000);
     }
-  } else { DEBUG_SERIAL.println(F("Static position set")); }
+  } else { DBG.println(F("Static position set")); }
 
   return response;
 }
