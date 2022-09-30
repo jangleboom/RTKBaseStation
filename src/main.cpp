@@ -95,7 +95,7 @@ AsyncWebServer server(80);
 
 String scannedSSIDs[MAX_SSIDS];
 
-void setupWifi(void);
+// void setupWifi(void);
 
 // Globals
 WiFiClient ntripCaster;
@@ -124,6 +124,7 @@ SFE_UBLOX_GNSS myGNSS;
  * @param surveyEnabled If true a survey will be started
  */
 void setupRTKBase(bool surveyEnabled);
+
 /**
  * @brief Get the Desired Survey Accuracy value
  * 
@@ -131,6 +132,7 @@ void setupRTKBase(bool surveyEnabled);
  * @return float Saved target accuracy value
  */
 float getDesiredSurveyAccuracy(const char* path);
+
 /**
  * @brief Run a survey to get locataion of this station
  * 
@@ -139,30 +141,35 @@ float getDesiredSurveyAccuracy(const char* path);
  * @param resp Response from whole GNSS setup process
  */
 void runSurvey(float desiredAccuracyInM, bool resp);
+
 /**
  * @brief Get the Longitude 
  * 
  * @return double Longitude
  */
 double getLongitude(void);
+
 /**
  * @brief Get the Latitude 
  * 
  * @return double Latitude
  */
 double getLatitude(void);
+
 /**
  * @brief Get the Height Over Sea Level as float
  * 
  * @return float Height Over Sea Level
  */
 float getHeightOverSeaLevel(void);
+
 /**
  * @brief Get the Horizontal Accuracy as float
  * 
  * @return float Horizontal Accuracy
  */
 float getHorizontalAccuracy(void);
+
 /**
  * @brief Func to save the location, but its not recommended to use this values for 
  *        setStationPosition func of in the Sparkfun lib, use better more accurate values
@@ -171,6 +178,7 @@ float getHorizontalAccuracy(void);
  * @return false If saving to SPIFFS failed
  */
 bool saveCurrentLocation(void);
+
 /**
  * @brief Func to use the saved location as static position, these value should be entered and
  *        saved via the web form and should be high precision coordinates too
@@ -179,17 +187,20 @@ bool saveCurrentLocation(void);
  * @return false If it failed
  */
 bool setStaticLocationFromSPIFFS(void);
+
 /**
  * @brief Print your current location with horizontal accuracy
  * 
  */
 void printPositionAndAccuracy(void);
+
 /**
  * @brief Show location on oled display
  * 
  * @param loc Location to show
  */
 void displaySavedLocation(location_t* loc);
+
 /**
  * @brief Task for sending data to rtk2go server
  * 
@@ -240,7 +251,7 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  setupWifi();
+  setupWiFi(&server);
 
   xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_PRIORITY, NULL, RUNNING_CORE_0);
 
@@ -252,9 +263,12 @@ void setup()
 void loop() 
 {
     #ifdef DEBUGGING
+    #ifdef TESTING
     DBG.println(F("Running Tests..."));
     aunit::TestRunner::run();
     #endif
+    #endif
+    
     wipeButton.loop();
 }
 
@@ -263,23 +277,23 @@ void loop()
                                 WiFi
 =================================================================================
 */
-void setupWifi() 
-{
-  WiFi.setHostname(DEVICE_NAME);
-  // Check if we have credentials for a available network
-  String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
-  String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
+// void setupWifi() 
+// {
+//   WiFi.setHostname(DEVICE_NAME);
+//   // Check if we have credentials for a available network
+//   String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
+//   String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
 
-  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) 
-  {
-    setupAPMode(DEVICE_NAME, AP_PASSWORD);
-    delay(500);
-  } else {
-   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
-   delay(500);
- }
-  startServer(&server);
-}
+//   if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) 
+//   {
+//     setupAPMode(DEVICE_NAME, AP_PASSWORD);
+//     delay(500);
+//   } else {
+//    setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
+//    delay(500);
+//  }
+//   startServer(&server);
+// }
 
 /*
 =================================================================================
@@ -587,8 +601,9 @@ void task_rtk_server_connection(void *pvParameters)
       taskStart:
 
       // First and again: check wifi connection
-      while (!checkConnectionToWifiStation()) 
-      {
+      if (!checkConnectionToWifiStation()) 
+      { 
+        setupWiFi(&server);
         vTaskDelay(5000/portTICK_PERIOD_MS);
       }
 
