@@ -95,8 +95,6 @@ AsyncWebServer server(80);
 
 String scannedSSIDs[MAX_SSIDS];
 
-// void setupWifi(void);
-
 // Globals
 WiFiClient ntripCaster;
 
@@ -271,29 +269,6 @@ void loop()
     
     wipeButton.loop();
 }
-
-/*
-=================================================================================
-                                WiFi
-=================================================================================
-*/
-// void setupWifi() 
-// {
-//   WiFi.setHostname(DEVICE_NAME);
-//   // Check if we have credentials for a available network
-//   String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
-//   String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
-
-//   if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) 
-//   {
-//     setupAPMode(DEVICE_NAME, AP_PASSWORD);
-//     delay(500);
-//   } else {
-//    setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
-//    delay(500);
-//  }
-//   startServer(&server);
-// }
 
 /*
 =================================================================================
