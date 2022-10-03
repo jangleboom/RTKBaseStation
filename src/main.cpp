@@ -288,8 +288,8 @@ float getDesiredSurveyAccuracy(const char* path)
 
 void runSurvey(float desiredAccuracyInM, bool resp) 
 {
-    //Alternatively to setting a static position, you could do a survey-in
-    // but it takes much longer to start generating RTCM data. See Example4_BaseWithLCD
+    // Alternatively to setting a static position, you could do a survey-in
+    // but it takes some time to start generating RTCM data. See Example4_BaseWithLCD
     // Check if Survey is in Progress before initiating one
     // From v2.0, the data from getSurveyStatus (UBX-NAV-SVIN) is returned in UBX_NAV_SVIN_t packetUBXNAVSVIN
     // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
@@ -303,7 +303,7 @@ void runSurvey(float desiredAccuracyInM, bool resp)
       while (true) 
       { 
         vTaskDelay(1000/portTICK_PERIOD_MS); 
-      }; //Freeze
+      }; // Freeze
     }
 
     while (myGNSS.getSurveyInActive() == true) 
