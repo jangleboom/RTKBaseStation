@@ -61,10 +61,8 @@ but this is not longtime tested, it could lead to accumulating biases */
 #define RUNNING_CORE_1                1  // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
-#define WIFI_PRIORITY                 1  // WiFi connection
-#define GNSS_PRIORITY                 2  // GNSS should have a lower priority
+#define GNSS_PRIORITY                 1
 #define RTK_TASK_INTERVAL_MS          10
-#define WIFI_TASK_INTERVAL_MS         30000
 
 
 #endif /*** RTK_BASE_CONFIG_H ***/

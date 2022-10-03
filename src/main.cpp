@@ -232,7 +232,7 @@ void setup()
     while (true) {};
   }
 
-  DBG.print(F("Device name: ")); DBG.println(DEVICE_NAME);
+  DBG.print(F("Device name: ")); DBG.println(DEVICE_TYPE);
 
   String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
   DBG.print(F("Location method: ")); DBG.println(locationMethod);
@@ -321,7 +321,7 @@ void runSurvey(float desiredAccuracyInM, bool resp)
       {
         display.clearDisplay();
         display.setCursor(0, 0);
-        display.print(DEVICE_NAME);
+        display.print(DEVICE_TYPE);
         display.setCursor(0, 20);
         display.print(status);
         display.setCursor(0, 40);
@@ -368,7 +368,7 @@ void runSurvey(float desiredAccuracyInM, bool resp)
           if (WiFi.isConnected()) 
           {
             display.setCursor(0, 20);
-            display.print(F("http://"));display.print(DEVICE_NAME);display.print(F(".local"));
+            display.print(F("http://"));display.print(DEVICE_TYPE);display.print(F(".local"));
           }
           display.setCursor(0, 30);
           display.print(F("Survey: "));
@@ -541,7 +541,7 @@ void task_rtk_server_connection(void *pvParameters)
         display.print(F("Go to access point: "));
         display.setCursor(0,30);
         display.print(F("SSID: "));
-        display.print(DEVICE_NAME);
+        display.print(DEVICE_TYPE);
         display.setCursor(0,40);
         display.print(F("PW: "));
         display.print(AP_PASSWORD);
@@ -698,7 +698,7 @@ void task_rtk_server_connection(void *pvParameters)
                   display.setCursor(0,0);
                   display.print("Timeout ERROR!");
                   display.setCursor(0,10);
-                  display.print(DEVICE_NAME);
+                  display.print(DEVICE_TYPE);
                   display.print(", hang up!");
                   display.setCursor(0,20);
                   display.print("ntripCaster stopped");
@@ -859,7 +859,7 @@ bool setupDisplay()
     display.print(F("   from"));
     display.setCursor(0,40);
     display.print(F("  "));
-    display.print(DEVICE_NAME);
+    display.print(DEVICE_TYPE);
     display.display();
     display.setTextSize(1);
     
