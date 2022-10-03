@@ -505,7 +505,7 @@ void task_rtk_server_connection(void *pvParameters)
 {
     (void)pvParameters;
 
-    Wire.setClock(I2C_FREQUENCY_100K);
+    Wire.setClock(I2C_FREQUENCY_400K);
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
 
