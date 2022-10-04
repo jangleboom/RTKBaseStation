@@ -9,6 +9,10 @@ Infrastructure:
 * free line of sight between antenna (horizontal placed) an sky
 * high-precision ECEF coordinates of the location of the antenna (put it into the code)
 
+### Dependencies
+* [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
+* [RTKBaseManager](https://github.com/audio-communication-group/RTKBaseManager)
+
 To connect to a caster you need to create a secrets.h file in your `lib/CasterSecrets/` dir with your credentials that looks like this:
 
 ````
