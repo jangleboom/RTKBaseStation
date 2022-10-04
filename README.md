@@ -13,6 +13,7 @@ Infrastructure:
 * [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
 * [RTKBaseManager](https://github.com/audio-communication-group/RTKBaseManager)
 
+### Caster connection
 To connect to a caster you need to create a secrets.h file in your `lib/CasterSecrets/` dir with your credentials that looks like this:
 
 ````
