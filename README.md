@@ -1,4 +1,4 @@
-<img align="right" src="./screenshots/sendingToCaster.png" width="240"/>
+<img align="right" src="./screenshots/sendingToCaster.pdf" width="240"/>
 ### Real Time Kinematics Base Station (RTK Server)
 Hardware used:   
 * Sparkfun ESP32 Thing Plus 
