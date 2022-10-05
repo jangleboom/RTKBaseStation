@@ -280,7 +280,7 @@ float getDesiredSurveyAccuracy(const char* path)
   String savedAccuray = readFile(SPIFFS, path);
   if (savedAccuray.isEmpty()) 
   {
-    return DESIRED_ACCURACY_M;
+    return kDesiredAccuracy;
   } else {
     return savedAccuray.toFloat();
   }
@@ -585,7 +585,7 @@ void task_rtk_server_connection(void *pvParameters)
       // Connect if we are not already
       if (ntripCaster.connected() == false) 
       {
-          DBG.printf("Opening socket to %s\n", CASTER_HOST);
+          DBG.printf("Opening socket to %s\n", casterHost.c_str());
 
         if (ntripCaster.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == true)  // Attempt connection
         {

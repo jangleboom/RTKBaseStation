@@ -16,7 +16,7 @@ Infrastructure:
 * [RTKBaseManager](https://github.com/audio-communication-group/RTKBaseManager)
 
 ### Caster connection
-To connect to a caster you need to create a secrets.h file in your `lib/CasterSecrets/` dir with your credentials that looks like this:
+If you are not using the web form of the RTKRoverManager, to connect to a caster you need to create a CasterSecrets.h file with your credentials that looks like this:
 
 ````
 #ifndef RTK_CASTER_SECRETS_H
@@ -26,24 +26,26 @@ To connect to a caster you need to create a secrets.h file in your `lib/CasterSe
 
 // RTK2Go MountPoint http://www.rtk2go.com:2101/SNIP::STATUS#uptime
 // Email: YOUR_RTK2GO_ACCOUNT_EMAIL.com
-const char casterHost[] = "rtk2go.com";
-const uint16_t casterPort = 2101;
-const char mountPoint[] = "YOUR_RTK2GO_MOUNT_POINT"; //The mount point you want to push data to
+const char kCasterHost[] = "rtk2go.com";
+const uint16_t kCasterPort = 2101;
+const char kMountPoint[] = "YOUR_RTK2GO_MOUNT_POINT"; //The mount point you want to push data to
 // Use "WEEK2208" until your registration is confirmed by the caster
-const char mountPointPW[] = "YOUR_RTK2GO_MOUNT_POINT_PASSWORD"; 
+const char kMountPointPW[] = "YOUR_RTK2GO_MOUNT_POINT_PASSWORD"; 
 
 // Or
 
 // Another free NTRIP Caster is Emlid
 // Emlid Caster MountPoint
 // Email: YOUR_EMLID_ACCOUNT_EMAIL.COM
-const char casterHost[] = "caster.emlid.com";
-const uint16_t casterPort = 2101;
-const char mountPoint[] = "YOUR_EMLID_MOUNT_POINT"; //The mount point you want to push data to
-const char mountPointPW[] = "YOUR_EMLID_MOUNT_POINT_PASSWORD";
+const char kCasterHost[] = "caster.emlid.com";
+const uint16_t kCasterPort = 2101;
+const char kMountPoint[] = "YOUR_EMLID_MOUNT_POINT"; //The mount point you want to push data to
+const char kMountPointPW[] = "YOUR_EMLID_MOUNT_POINT_PASSWORD";
 
 // Use only one of this choices!
 
 #endif /*** RTK_CASTER_SECRETS_H ***/
 
 ````
+
+Then you have to replace the dynamically read credentials with the constant ones (add the k prefix e. g: mountPoint --> kMountPoint) in the main.cpp.
