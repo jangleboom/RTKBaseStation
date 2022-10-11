@@ -15,6 +15,8 @@ Infrastructure:
 * [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
 * [RTKBaseManager](https://github.com/audio-communication-group/RTKBaseManager)
 
+![plot](./fritzing/RTKBaseStation_bb.png)
+
 ### Caster connection
 If you are not using the web form of the RTKRoverManager, to connect to a caster you need to create a CasterSecrets.h file with your credentials that looks like this:
 
