@@ -576,9 +576,9 @@ void task_rtk_server_connection(void *pvParameters)
       taskStart:
 
       // First and again: check wifi connection
-      if (!checkConnectionToWifiStation()) 
+      while (! checkConnectionToWifiStation()) 
       { 
-        setupWiFi(&server);
+        // setupWiFi(&server);
         vTaskDelay(5000/portTICK_PERIOD_MS);
       }
 
