@@ -8,5 +8,5 @@
 
 [submodule "lib/RTKBaseManager"]
 	path = lib/RTKBaseManager
-	url = https://github.com/audio-communication-group/RTKBaseManager.git
+	url = https://github.com/jangleboom/RTKBaseManager.git
 	branch = main
