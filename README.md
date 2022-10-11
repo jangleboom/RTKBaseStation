@@ -19,7 +19,7 @@ Infrastructure:
 ![plot](./fritzing/RTKBaseStation_bb.png)
 
 ### Caster connection
-If you are not using the web form of the RTKRoverManager, to connect to a caster you need to create a CasterSecrets.h file with your credentials that looks like this:
+To connect to a caster you need to create a CasterSecrets.h file with your credentials that looks like this:
 
 ````
 #ifndef RTK_CASTER_SECRETS_H
@@ -51,4 +51,4 @@ const char kMountPointPW[] = "YOUR_EMLID_MOUNT_POINT_PASSWORD";
 
 ````
 
-Then you have to replace the dynamically read credentials with the constant ones (add the k prefix e. g: mountPoint --> kMountPoint) in the main.cpp.
+If you are not using the web form of the RTKRoverManager, then you have to replace the dynamically read credentials with the constant ones (add the k prefix e. g: mountPoint --> kMountPoint) in the main.cpp.
