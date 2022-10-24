@@ -2,7 +2,7 @@
 
 ### Real Time Kinematics Base Station (RTK Server)
 Hardware used:   
-* Sparkfun ESP32 Thing Plus 
+* Adafruit Feather ESP32 Huzzah 
 * SparkFun GPS-RTK-SMA Breakout - ZED-F9P (Qwiic)
 * ublox ANN-MB1 antenna
 
