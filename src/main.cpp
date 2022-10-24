@@ -74,8 +74,8 @@ bool setupDisplay(void);
 =================================================================================
 */
 #include "Button2.h"
-
-Button2 wipeButton = Button2(BUTTON_PIN, INPUT, false, false);
+// Button to press to wipe out stored WiFi credentials
+Button2 wipeButton = Button2(WIPE_BUTTON_PIN, INPUT, false, false);
 
 void buttonHandler(Button2 &btn);
 
@@ -237,7 +237,7 @@ void setup()
   DBG.print(F("Location method: ")); DBG.println(locationMethod);
   
   location_t lastLocation;
-  if (getLocatioresponse &= myGNSS.setHighPrecisionMode(true);nFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) 
+  if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) 
   {
     printLocation(&lastLocation);
   } else {
@@ -1088,7 +1088,7 @@ bool setStaticLocationFromSPIFFS()
   bool response = true;
   // response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, baseLoc.alt_hp, true); 
   response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, (int32_t)(baseLoc.alt/10) /* cm */, (int8_t)((baseLoc.alt%10)*10) + baseLoc.alt_hp /* 0.1 mm*/, true); 
-  response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
+  // response &= myGNSS.setHighPrecisionMode(true); // TODO: NMEA not needed here, because its disabled anyway?
   // Or use Earth-centered coordinates:
   //response &= myGNSS.setStaticPosition(ECEF_X_CM, ECEF_X_HP, ECEF_Y_CM, ECEF_Y_HP, ECEF_Z_CM, ECEF_Z_HP);  //With high precision 0.1mm parts
   if (response == false) 

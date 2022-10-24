@@ -71,7 +71,7 @@ but this is not longtime tested, it could lead to accumulating biases, do not ch
 =================================================================================
 */
 // Button to press to wipe out stored WiFi credentials
-#define BUTTON_PIN                    15
+#define WIPE_BUTTON_PIN                    15
 
 #endif /*** RTK_BASE_CONFIG_H ***/
 
