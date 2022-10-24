@@ -8,8 +8,9 @@ Hardware used:
 
 Infrastructure:
 * WiFi
-* free line of sight between antenna (horizontal placed) an sky
-* high-precision ECEF coordinates of the location of the antenna (put it into the code)
+* free line of sight between antenna (horizontal placed) at sky 
+* making an survey OR
+* set high-precision coordinates of the location of the antenna (you can use the web form of the RTKBaseManager)
 
 ### Dependencies
 * [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
