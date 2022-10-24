@@ -51,3 +51,8 @@ const char kMountPointPW[] = "YOUR_EMLID_MOUNT_POINT_PASSWORD";
 ````
 
 If you are not using the web form of the RTKRoverManager, then you have to replace the dynamically read credentials with the constant ones (add the k prefix e. g: mountPoint --> kMountPoint) in the main.cpp.
+
+### Usage
+Preparation
+* make a survey (automatically at first run or you can use the the web form of the RTKBaseManager) OR
+* set high-precision coordinates of the location of the antenna (you can use the web form of the RTKBaseManager)
