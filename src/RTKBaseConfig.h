@@ -65,6 +65,13 @@ but this is not longtime tested, it could lead to accumulating biases, do not ch
 #define GNSS_PRIORITY                 1
 #define RTK_TASK_INTERVAL_MS          10
 
+/*
+=================================================================================
+                          Button(s) settings
+=================================================================================
+*/
+// Button to press to wipe out stored WiFi credentials
+#define BUTTON_PIN                    15
 
 #endif /*** RTK_BASE_CONFIG_H ***/
 

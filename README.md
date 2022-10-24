@@ -13,7 +13,7 @@ Infrastructure:
 
 ### Dependencies
 * [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
-* [RTKBaseManager](https://github.com/audio-communication-group/RTKBaseManager)
+* [RTKBaseManager](https://github.com/jangleboom/RTKBaseManager)
 
 ### Circuit diagram
 ![plot](./fritzing/RTKBaseStation_bb.png)
