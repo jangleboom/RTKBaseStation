@@ -244,7 +244,7 @@ void setup()
     DBG.println(F("No valid location found in SPIFFS"));
   }
 
-  wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set here too  
+  wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
