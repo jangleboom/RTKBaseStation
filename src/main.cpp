@@ -223,13 +223,16 @@ void setup()
 
   setupDisplay();
   
-  // Initialize SPIFFS, set true for formatting (at first time running is a must)
-  bool format = false;
-  if (!setupSPIFFS(format)) 
+  // Initialize SPIFFS
+  if (!setupSPIFFS()) 
   {
     DBG.println(F("setupSPIFFS failed, freezing"));
     while (true) {};
   }
+
+  // Uncomment for first use or for clearing all paths
+  //formatSPIFFS(); // Uses board_build.partitions in platformio.ini
+
 
   DBG.print(F("Device name: ")); DBG.println(DEVICE_TYPE);
 
