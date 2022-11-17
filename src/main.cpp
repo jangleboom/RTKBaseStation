@@ -221,7 +221,7 @@ void setup()
   while (!Serial) {};
   #endif
 
-  setupDisplay();
+  DBG.print(F("Device name: ")); DBG.println(DEVICE_TYPE);
   
   // Initialize SPIFFS
   if (!setupSPIFFS()) 
@@ -233,9 +233,9 @@ void setup()
   // Uncomment for first use or for clearing all paths
   //formatSPIFFS(); // Uses board_build.partitions in platformio.ini
 
-
-  DBG.print(F("Device name: ")); DBG.println(DEVICE_TYPE);
-
+  setupWiFi(&server);
+  setupDisplay();
+  
   String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
   DBG.print(F("Location method: ")); DBG.println(locationMethod);
   
@@ -250,8 +250,6 @@ void setup()
   wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
-
-  setupWiFi(&server);
 
   xTaskCreatePinnedToCore( &task_rtk_server_connection, "task_rtk_server_connection", 20480, NULL, GNSS_PRIORITY, NULL, RUNNING_CORE_0);
 
