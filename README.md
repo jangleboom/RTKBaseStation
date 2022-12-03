@@ -15,7 +15,7 @@ Infrastructure:
 * [RTKBaseManager](https://github.com/jangleboom/RTKBaseManager)
 
 ### Circuit diagram
-![plot](./fritzing/RTKBaseStation_bb.png)
+![plot](./fritzing/RTKBaseStation_bb.jpeg)
 
 ### Caster connection
 To connect to a caster you need to create a CasterSecrets.h file with your credentials that looks like this:
