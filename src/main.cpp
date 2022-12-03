@@ -838,7 +838,7 @@ bool setupDisplay()
   if (!display.begin(OLED_I2C_ADDR, true)) 
   {
     DBG.println("Could not find SH110X? Check wiring");
-    while (true) delay(1000);
+    //while (true) delay(1000);
   } else { // Address 0x3C default
     displayConnected = true;
   }
