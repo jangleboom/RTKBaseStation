@@ -374,11 +374,11 @@ void runSurvey(float desiredAccuracyInM, bool resp)
           display.print(F("Survey: "));
           display.print(secondsToTimeFormat(timeElapsed)); // Call the helper function
           display.setCursor(0, 40);
-          display.print(F("current Acc.: "));
+          display.print(F("Current Acc.: "));
           display.print(String(meanAccuracy).c_str()); // Call the helper function
           display.print(F(" m"));
           display.setCursor(0, 50);
-          display.print("target Acc.: ");
+          display.print("Target Acc.: ");
           display.print(String(desiredAccuracyInM).c_str()); // Call the helper function
           display.print(F(" m"));
           display.display();
