@@ -655,6 +655,7 @@ void task_rtk_server_connection(void *pvParameters)
                     display.print("Client settings!");
                     display.setCursor(0,50);
                     display.print("Freezing...");
+                    display.display();
                   }
                   while (true) 
                   { 
