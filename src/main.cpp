@@ -663,7 +663,7 @@ void task_rtk_server_connection(void *pvParameters)
                   }
                 }
                 // checkConnectionToWifiStation();
-                vTaskDelay(1000);
+                vTaskDelay(10000); // TODO: give this retry interval a name
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             }  // End attempt to connect
