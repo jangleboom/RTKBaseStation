@@ -59,4 +59,4 @@ Preparation
 
 Change setup
 * use the web form of the local server "rtkbase.local" OR
-* force to open an access point by pressing the wipe button on hardware (all saved data will be deleted). Connect to AP with SSID "rtkbase" and fill the web form on "192.168.4.1", save and reboot the ESP32.
+* force to open an access point by pressing the wipe button on hardware (all saved data will be deleted). Connect your computer to the AP with SSID "rtkbase" and fill the web form on address "192.168.4.1", save and reboot the ESP32.
