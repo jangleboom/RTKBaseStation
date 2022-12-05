@@ -56,3 +56,7 @@ If you are not using the web form of the RTKRoverManager, then you have to repla
 Preparation
 * make a survey (automatically at first run or you can use the the web form of the RTKBaseManager: Wipe the memory, save and reboot) OR
 * set high-precision coordinates of the location of the antenna (you can use the web form of the RTKBaseManager: Enter the high-precision coordinates, save and reboot)
+
+Change setup
+* use the web form of the local server "rtkbase.local" OR
+* force to open an Access Point by pressing the wipe button on hardware (all saved data will be deleted). Connect to the AP "rtkbase" and fill the web form on "192.168.4.1", save and reboot the ESP32.
