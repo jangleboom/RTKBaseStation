@@ -54,7 +54,7 @@ If you are not using the web form of the RTKRoverManager, then you have to repla
 
 ### Usage
 Preparation
-* make a survey (automatically at first run or you can use the the web form of the RTKBaseManager: Wipe the memory, save and reboot) OR
+* make a survey (automatically at first run or you can use the the web form of the included RTKBaseManager: Wipe the memory, save and reboot) OR
 * set high-precision coordinates of the location of the antenna (you can use the web form of the RTKBaseManager: Enter the high-precision coordinates, save and reboot)
 
 Change setup
