@@ -62,3 +62,7 @@ Preparation
 Change setup
 * use the web form of the local server "rtkbase.local" OR
 * force to open an access point by pressing the wipe button on hardware (all saved data will be deleted). Connect your computer to the AP with SSID "rtkbase" and fill the web form on address "192.168.4.1", save and reboot the ESP32.
+
+
+The mklittlefs file in the root dir you have to [get](https://github.com/earlephilhower/mklittlefs/releases) depending on your OS.
+Or if you have Arduino IDE installed, you can borrow it from there. On macOS you can find it here: `~/Library/Arduino15/packages/esp32/tools/mklittlefs/3.0.0-gnu12-dc7f933/mklittlefs`.  Help for setup the file system you can find [here](https://randomnerdtutorials.com/esp8266-nodemcu-vs-code-platformio-littlefs/). This project was created on macOS (silicon).
