@@ -14,7 +14,7 @@
  * <br>
  * @date    2022/05/09
  * 
- * @todo    - Read SPIFFS settings before setup GNSS
+ * @todo    - Read LittleFS settings before setup GNSS
  *          - Set AP IP
  *          - first check if myGNSS is getting data BEFORE establish the caster connection,
  *            otherwise they will ban our IP for 4 hours minimum
@@ -85,7 +85,7 @@ void buttonHandler(Button2 &btn);
 =================================================================================
 */
 #include <WiFi.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <RTKBaseManager.h>
 #include <TestsRTKBaseStation.h>
 
@@ -171,8 +171,8 @@ float getHorizontalAccuracy(void);
  * @brief Func to save the location, but its not recommended to use this values for 
  *        setStationPosition func of in the Sparkfun lib, use better more accurate values
  * 
- * @return true If saving to SPIFFS was successful
- * @return false If saving to SPIFFS failed
+ * @return true If saving to LittleFS was successful
+ * @return false If saving to LittleFS failed
  */
 bool saveCurrentLocation(void);
 
@@ -183,7 +183,7 @@ bool saveCurrentLocation(void);
  * @return true If it was successful
  * @return false If it failed
  */
-bool setStaticLocationFromSPIFFS(void);
+bool setStaticLocationFromLittleFS(void);
 
 /**
  * @brief Print your current location with horizontal accuracy
@@ -223,28 +223,30 @@ void setup()
 
   DBG.print(F("Device name: ")); DBG.println(DEVICE_TYPE);
   
-  // Initialize SPIFFS
-  if (!setupSPIFFS()) 
+  //===============================================================================
+  // Initialize LittleFS
+  if (!setupLittleFS()) 
   {
-    DBG.println(F("setupSPIFFS failed, freezing"));
-    while (true) {};
+    formatLittleFS(); // Use board_build.partitions in platformio.ini
   }
 
-  // Uncomment for first use or for clearing all paths
-  //formatSPIFFS(); // Uses board_build.partitions in platformio.ini
-
+  // Uncomment if you want to format (e. g after changing partition sizes)
+  // (And dont forget to comment this again after one run ;)
+  //formatLittleFS();
+  //===============================================================================
+  
   setupWiFi(&server);
   setupDisplay();
   
-  String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
+  String locationMethod = readFile(LittleFS, PATH_RTK_LOCATION_METHOD);
   DBG.print(F("Location method: ")); DBG.println(locationMethod);
   
   location_t lastLocation;
-  if (getLocationFromSPIFFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) 
+  if (getLocationFromLittleFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) 
   {
     printLocation(&lastLocation);
   } else {
-    DBG.println(F("No valid location found in SPIFFS"));
+    DBG.println(F("No valid location found in LittleFS"));
   }
 
   wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init 
@@ -277,7 +279,7 @@ void loop()
 */
 float getDesiredSurveyAccuracy(const char* path) 
 {
-  String savedAccuray = readFile(SPIFFS, path);
+  String savedAccuray = readFile(LittleFS, path);
   if (savedAccuray.isEmpty()) 
   {
     return kDesiredAccuracy;
@@ -466,10 +468,10 @@ void setupRTKBase(bool surveyEnabled)
   if (!surveyEnabled) 
   {
     // Latitude, Longitude, Altitude input:
-    setStaticLocationFromSPIFFS();
+    setStaticLocationFromLittleFS();
   } else 
   {
-    // Read safed target accuracy from SPIFFS
+    // Read safed target accuracy from LittleFS
     float desiredAcc = getDesiredSurveyAccuracy(PATH_RTK_LOCATION_SURVEY_ACCURACY);
     // Start survey-in
     runSurvey(desiredAcc, response);
@@ -514,10 +516,10 @@ void task_rtk_server_connection(void *pvParameters)
     int responseSpot = 0;
 
     // Read credentials
-    String casterHost = readFile(SPIFFS, PATH_RTK_CASTER_HOST);
-    String casterPort = readFile(SPIFFS, PATH_RTK_CASTER_PORT);
-    String mountPoint =  readFile(SPIFFS, PATH_RTK_MOINT_POINT);
-    String mountPointPW =  readFile(SPIFFS, PATH_RTK_MOINT_POINT_PW);
+    String casterHost = readFile(LittleFS, PATH_RTK_CASTER_HOST);
+    String casterPort = readFile(LittleFS, PATH_RTK_CASTER_PORT);
+    String mountPoint =  readFile(LittleFS, PATH_RTK_MOINT_POINT);
+    String mountPointPW =  readFile(LittleFS, PATH_RTK_MOINT_POINT_PW);
 
     // Check RTK credentials
     bool credentialsExists = true;
@@ -554,10 +556,10 @@ void task_rtk_server_connection(void *pvParameters)
       vTaskDelay(1000);
     }
 
-    String locationMethod = readFile(SPIFFS, PATH_RTK_LOCATION_METHOD);
-    String latitude = readFile(SPIFFS, PATH_RTK_LOCATION_LATITUDE);
-    String longitude = readFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE);
-    String altitude = readFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE);
+    String locationMethod = readFile(LittleFS, PATH_RTK_LOCATION_METHOD);
+    String latitude = readFile(LittleFS, PATH_RTK_LOCATION_LATITUDE);
+    String longitude = readFile(LittleFS, PATH_RTK_LOCATION_LONGITUDE);
+    String altitude = readFile(LittleFS, PATH_RTK_LOCATION_ALTITUDE);
 
     bool startSurvey = true;
     startSurvey &=  locationMethod.isEmpty() || \
@@ -746,7 +748,7 @@ void task_rtk_server_connection(void *pvParameters)
               DBG.println(F("Location updated, saved to file."));
               lastAccuracy = accuracy;
               /* Send saved values to RTK2 device */
-              if (setStaticLocationFromSPIFFS()) 
+              if (setStaticLocationFromLittleFS()) 
               {
                /* Be sure that this values are used after reboot */
                 setLocationMethodCoords();  
@@ -823,7 +825,7 @@ void buttonHandler(Button2 &btn)
   {
     digitalWrite(LED_BUILTIN, HIGH);
     DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
-    wipeSpiffsFiles();
+    wipeLittleFSFiles();
     ESP.restart();
   }
 }
@@ -1030,13 +1032,13 @@ bool saveCurrentLocation()
 
     bool success = true;
     String csvStr = String(latitude) + SEP + String(latitudeHp);
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LATITUDE, csvStr.c_str());
+    success &= writeFile(LittleFS, PATH_RTK_LOCATION_LATITUDE, csvStr.c_str());
     csvStr = String(longitude) + SEP + String(longitudeHp);
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_LONGITUDE, csvStr.c_str());
+    success &= writeFile(LittleFS, PATH_RTK_LOCATION_LONGITUDE, csvStr.c_str());
     // csvStr = String(msl) + SEP + String(mslHp); // Mean sea level
     csvStr = String(elipsoid) + SEP + String(elipsoidHp); // Elipsoid height
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
-    success &= writeFile(SPIFFS, PATH_RTK_LOCATION_COORD_ACCURACY, String(hAccuracy, 4).c_str());
+    success &= writeFile(LittleFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
+    success &= writeFile(LittleFS, PATH_RTK_LOCATION_COORD_ACCURACY, String(hAccuracy, 4).c_str());
     return success;
 }
 
@@ -1074,7 +1076,7 @@ void displaySavedLocation(location_t* loc)
 
     display.setCursor(0, 50);
     display.print(F("hAcc: "));
-    display.print(readFile(SPIFFS, PATH_RTK_LOCATION_COORD_ACCURACY));
+    display.print(readFile(LittleFS, PATH_RTK_LOCATION_COORD_ACCURACY));
     display.print(F(" m   "));
     display.display();
   } else {
@@ -1082,10 +1084,10 @@ void displaySavedLocation(location_t* loc)
   }
 }
 
-bool setStaticLocationFromSPIFFS() 
+bool setStaticLocationFromLittleFS() 
 {
   location_t baseLoc;
-  getLocationFromSPIFFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY);
+  getLocationFromLittleFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY);
   printLocation(&baseLoc);
   bool response = true;
   // response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, baseLoc.alt_hp, true); 
