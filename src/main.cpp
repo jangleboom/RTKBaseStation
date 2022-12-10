@@ -243,11 +243,14 @@ void setup()
   setupWiFi(&server);
   setupDisplay();
   
-  String locationMethod = readFile(LittleFS, PATH_RTK_LOCATION_METHOD);
+  String locationMethod = readFile(LittleFS, getPath(PARAM_RTK_LOCATION_METHOD).c_str());
   DBG.print(F("Location method: ")); DBG.println(locationMethod);
   
   location_t lastLocation;
-  if (getLocationFromLittleFS(&lastLocation, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY)) 
+  if (getLocationFromLittleFS(&lastLocation,  getPath(PARAM_RTK_LOCATION_LATITUDE).c_str(), \                                              
+                                              getPath(PARAM_RTK_LOCATION_LONGITUDE).c_str(), \
+                                              getPath(PARAM_RTK_LOCATION_ALTITUDE).c_str(),\
+                                              getPath(PARAM_RTK_LOCATION_COORD_ACCURACY).c_str() ) )
   {
     printLocation(&lastLocation);
   } else {
@@ -477,7 +480,7 @@ void setupRTKBase(bool surveyEnabled)
   } else 
   {
     // Read safed target accuracy from LittleFS
-    float desiredAcc = getDesiredSurveyAccuracy(PATH_RTK_LOCATION_SURVEY_ACCURACY);
+    float desiredAcc = getDesiredSurveyAccuracy(getPath(PARAM_RTK_LOCATION_SURVEY_ACCURACY).c_str());
     // Start survey-in
     runSurvey(desiredAcc, response);
   }
@@ -521,10 +524,10 @@ void task_rtk_server_connection(void *pvParameters)
     int responseSpot = 0;
 
     // Read credentials
-    String casterHost = readFile(LittleFS, PATH_RTK_CASTER_HOST);
-    String casterPort = readFile(LittleFS, PATH_RTK_CASTER_PORT);
-    String mountPoint =  readFile(LittleFS, PATH_RTK_MOINT_POINT);
-    String mountPointPW =  readFile(LittleFS, PATH_RTK_MOINT_POINT_PW);
+    String casterHost = readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
+    String casterPort = readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
+    String mountPoint =  readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
+    String mountPointPW =  readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT_PW).c_str());
 
     // Check RTK credentials
     bool credentialsExists = true;
@@ -561,10 +564,10 @@ void task_rtk_server_connection(void *pvParameters)
       vTaskDelay(1000);
     }
 
-    String locationMethod = readFile(LittleFS, PATH_RTK_LOCATION_METHOD);
-    String latitude = readFile(LittleFS, PATH_RTK_LOCATION_LATITUDE);
-    String longitude = readFile(LittleFS, PATH_RTK_LOCATION_LONGITUDE);
-    String altitude = readFile(LittleFS, PATH_RTK_LOCATION_ALTITUDE);
+    String locationMethod = readFile(LittleFS, getPath(PARAM_RTK_LOCATION_METHOD).c_str());
+    String latitude = readFile(LittleFS, getPath(PARAM_RTK_LOCATION_LATITUDE).c_str());
+    String longitude = readFile(LittleFS, getPath(PARAM_RTK_LOCATION_LONGITUDE).c_str());
+    String altitude = readFile(LittleFS, getPath(PARAM_RTK_LOCATION_ALTITUDE).c_str());
 
     bool startSurvey = true;
     startSurvey &=  locationMethod.isEmpty() || \
@@ -1037,13 +1040,13 @@ bool saveCurrentLocation()
 
     bool success = true;
     String csvStr = String(latitude) + SEP + String(latitudeHp);
-    success &= writeFile(LittleFS, PATH_RTK_LOCATION_LATITUDE, csvStr.c_str());
+    success &= writeFile(LittleFS, getPath(PARAM_RTK_LOCATION_LATITUDE).c_str(), csvStr.c_str());
     csvStr = String(longitude) + SEP + String(longitudeHp);
-    success &= writeFile(LittleFS, PATH_RTK_LOCATION_LONGITUDE, csvStr.c_str());
+    success &= writeFile(LittleFS, getPath(PARAM_RTK_LOCATION_LONGITUDE).c_str(), csvStr.c_str());
     // csvStr = String(msl) + SEP + String(mslHp); // Mean sea level
     csvStr = String(elipsoid) + SEP + String(elipsoidHp); // Elipsoid height
-    success &= writeFile(LittleFS, PATH_RTK_LOCATION_ALTITUDE, csvStr.c_str());
-    success &= writeFile(LittleFS, PATH_RTK_LOCATION_COORD_ACCURACY, String(hAccuracy, 4).c_str());
+    success &= writeFile(LittleFS, getPath(PARAM_RTK_LOCATION_ALTITUDE).c_str(), csvStr.c_str());
+    success &= writeFile(LittleFS, getPath(PARAM_RTK_LOCATION_COORD_ACCURACY).c_str(), String(hAccuracy, 4).c_str());
     return success;
 }
 
@@ -1081,7 +1084,7 @@ void displaySavedLocation(location_t* loc)
 
     display.setCursor(0, 50);
     display.print(F("hAcc: "));
-    display.print(readFile(LittleFS, PATH_RTK_LOCATION_COORD_ACCURACY));
+    display.print( readFile( LittleFS, getPath(PARAM_RTK_LOCATION_COORD_ACCURACY).c_str() ) );
     display.print(F(" m   "));
     display.display();
   } else {
@@ -1092,7 +1095,10 @@ void displaySavedLocation(location_t* loc)
 bool setStaticLocationFromLittleFS() 
 {
   location_t baseLoc;
-  getLocationFromLittleFS(&baseLoc, PATH_RTK_LOCATION_LATITUDE, PATH_RTK_LOCATION_LONGITUDE, PATH_RTK_LOCATION_ALTITUDE, PATH_RTK_LOCATION_COORD_ACCURACY);
+  getLocationFromLittleFS(&baseLoc, getPath(PARAM_RTK_LOCATION_LATITUDE).c_str(), \
+                                    getPath(PARAM_RTK_LOCATION_LONGITUDE).c_str(), \
+                                    getPath(PARAM_RTK_LOCATION_ALTITUDE).c_str(), \
+                                    getPath(PARAM_RTK_LOCATION_COORD_ACCURACY).c_str());
   printLocation(&baseLoc);
   bool response = true;
   // response &= myGNSS.setStaticPosition(baseLoc.lat, baseLoc.lat_hp, baseLoc.lon, baseLoc.lon_hp, baseLoc.alt, baseLoc.alt_hp, true); 
