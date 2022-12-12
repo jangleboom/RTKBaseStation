@@ -247,10 +247,11 @@ void setup()
   DBG.print(F("Location method: ")); DBG.println(locationMethod);
   
   location_t lastLocation;
-  if (getLocationFromLittleFS(&lastLocation,  getPath(PARAM_RTK_LOCATION_LATITUDE).c_str(), \                                              
-                                              getPath(PARAM_RTK_LOCATION_LONGITUDE).c_str(), \
-                                              getPath(PARAM_RTK_LOCATION_ALTITUDE).c_str(),\
-                                              getPath(PARAM_RTK_LOCATION_COORD_ACCURACY).c_str() ) )
+  if (getLocationFromLittleFS(&lastLocation, \
+                              getPath(PARAM_RTK_LOCATION_LATITUDE).c_str(), \
+                              getPath(PARAM_RTK_LOCATION_LONGITUDE).c_str(), \
+                              getPath(PARAM_RTK_LOCATION_ALTITUDE).c_str(), \
+                              getPath(PARAM_RTK_LOCATION_COORD_ACCURACY).c_str() ) )
   {
     printLocation(&lastLocation);
   } else {
