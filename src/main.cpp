@@ -668,10 +668,8 @@ void task_rtk_server_connection(void *pvParameters)
                     display.print("Freezing...");
                     display.display();
                   }
-                  while (true) 
-                  { 
-                    delay(1000);
-                  }
+                  // Freeze
+                  while (true) { delay(1000); }
                 }
                 // checkConnectionToWifiStation();
                 vTaskDelay(10000); // TODO: give this retry interval a name
