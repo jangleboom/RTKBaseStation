@@ -672,7 +672,7 @@ void task_rtk_server_connection(void *pvParameters)
                   while (true) { delay(1000); }
                 }
                 // checkConnectionToWifiStation();
-                vTaskDelay(10000); // TODO: give this retry interval a name
+                vTaskDelay(RTK2GO_RECONNECT_INTERVAL); // TODO: give this retry interval a name
                 goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
                 }
             }  // End attempt to connect
@@ -831,8 +831,14 @@ void buttonHandler(Button2 &btn)
   if (btn == wipeButton) 
   {
     digitalWrite(LED_BUILTIN, HIGH);
-    DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
-    wipeLittleFSFiles();
+    // DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
+    // Clear whole memory
+    // wipeLittleFSFiles();
+
+    // Or clear just WiFi credentials
+    clearPath(getPath(PARAM_WIFI_SSID).c_str());
+    clearPath(getPath(PARAM_WIFI_PASSWORD).c_str());
+
     ESP.restart();
   }
 }
