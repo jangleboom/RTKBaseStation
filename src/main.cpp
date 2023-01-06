@@ -2,7 +2,7 @@
 /*******************************************************************************
  * @file    main.cpp
  * @authors Markus Hädrich inspired by SparkFun Electronics / Nathan Seidle
- * <br>
+ * <br> 
  * @brief   This is part of a distributed software, here: 
  *          Real Time Kinematics (RTK) base station.
  *          The ESP32 is acting as a 'server' to a 'caster'. In this case we will 
@@ -30,14 +30,14 @@
  * @note    How to handle WiFi: 
  *           - Push the button 
  *           - Join the AP thats appearing 
- *               -# SSID: e. g. "RTKBase" 
- *               -# PW: e. g. "12345678"
- *            - Open address 192.168.4.1 in your browser and set credentials you are 
- *              using for you personal access point on your smartphone
- *            - If the process is done, the LED turns off and the device reboots
- *            - If there are no Wifi credentials stored in the EEPROM, the device 
- *              will jump in WIFI_AP mode on startup, if yes it tries to connect in WIFI_STA to the 
- *              saved SSID
+ *             - SSID: e. g. "RTKBase" 
+ *             - PW: e. g. "12345678"
+ *           - Open address 192.168.4.1 in your browser and set credentials you are 
+ *             using for you personal access point on your smartphone
+ *           - If the process is done, the LED turns off and the device reboots
+ *           - If there are no Wifi credentials stored in the EEPROM, the device 
+ *             will jump in WIFI_AP mode on startup, if yes it tries to connect in WIFI_STA to the 
+ *             saved SSID
  * 
  *          How to measure battery: Easiest way, use a fuel gauge breakout board 
  *          e. g. Adafruit_LC709203F, because the Sparkfun ESP32 Thing Plus 
