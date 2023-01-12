@@ -1,7 +1,8 @@
 #ifndef RTK_CASTER_SECRETS_H
 #define RTK_CASTER_SECRETS_H
 #include <Arduino.h>
-// A place for your default caster credentials
+// A place for your default caster credentials 
+// (this is not needed if you use default case with the webform of the RTKBaseManager class)
 
 /**
  * While a survey-in is easy to set up and fine for an in-the-field way to establish the location 
