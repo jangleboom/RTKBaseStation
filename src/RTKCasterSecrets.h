@@ -36,38 +36,22 @@ response &= myGNSS.setStaticPosition(-128020830, -80, -471680384, -70, 408666581
 ECEF coordinates: Example tiny office Brieslang
 
 Get LatLongHight coords from map: https://www.gpskoordinaten.de/ (and verify the coords on new Google Maps cards)
-Latitude : 52.6013104707097 | Longitude : 13.001770401773417 | Höhe : 39 Meter
 Convert LLH coords into ECEF XYZ coords: https://tool-online.com/en/coordinate-converter.php
 (1 mm resolution only)
-WGS84_XYZ (geocentric)  ECEF-X 3782519.925 or 3782521.875
-WGS84_XYZ (geocentric)  ECEF-Y 873386.641  or 873386.472
-WGS84_XYZ (geocentric)  ECEF-Z 5043750.593 or 5043752.317
+WGS84_XYZ (geocentric)  ECEF-X 
+WGS84_XYZ (geocentric)  ECEF-Y 
+WGS84_XYZ (geocentric)  ECEF-Z 
 
 after running look here: http://new.rtk2go.com:2101/SNIP::STATUS
 */
 
-/*
-const int32_t ECEF_X_CM = 378252188;   // Earth-centered-X in cm
-const int8_t ECEF_X_HP = 02;           // Earth-centered-X, high precision extension 0.1mm
-const int32_t ECEF_Y_CM = 87338647;    // Earth-centered-Y in cm
-const int8_t ECEF_Y_HP = 32;           // Earth-centered-Y, high precision extension 0.1mm
-const int32_t ECEF_Z_CM = 504375230;   // Earth-centered-Z in cm
-const int8_t ECEF_Z_HP = 10;           // Earth-centered-Z, high precision extension 0.1mm
 
-const int32_t LATITUDE =  526013065;   // 7-digits
-const int8_t LATITUDE_HP = 90;         // high precision extension
-const int32_t LONGITUDE = 130017615;   // 7-digits
-const int8_t LONGITUDE_HP = 00;        // high precision extension
-const int32_t ALTITUDE = 41500;        // Unit: mm
-const int8_t ALTITUDE_HP = 0;          // high precision extension
-*/
+const float kDesiredAccuracy = 0.01;
+// http://new.rtk2go.com:2101/SNIP::STATUS
 
-const float kDesiredAccuracy = 0.06;
-//RTK2Go MountPoint 1 http://new.rtk2go.com:2101/SNIP::STATUS
-// Email: mr.markuese@gmail.com
 const char kCasterHost[] = "rtk2go.com";
 const uint16_t kCasterPort = 2101;
-const char KMountPoint[] = "rtkbrieselang"; //The mount point you want to push data to
-const char kMountPointPW[] = "WEEK2208";
+const char kMountPoint[] = "YOUR_RTK2GO_MOUNTPOINT";            //The mount point you want to push data to
+const char kMountPointPW[] = "YOUR_RTK2GO_MOUNTPOINT_PASSWORD";
 
 #endif /*** RTK_CASTER_SECRETS_H ***/
