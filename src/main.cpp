@@ -537,10 +537,21 @@ void task_rtk_server_connection(void *pvParameters)
     credentialsExists &= !mountPoint.isEmpty();
     credentialsExists &= !mountPointPW.isEmpty();
     
-    while (!credentialsExists) 
+    if ( ! credentialsExists) 
     {
       DBG.println("RTK Credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
       
+        DBG.println(F("STOP, enter wifi+rtk"));
+        DBG.println(F("credentials first!"));
+        DBG.println(F("Go to access point: "));
+        DBG.print(F("SSID: "));
+        DBG.println(getDeviceName(DEVICE_TYPE).c_str());
+        DBG.print(F("PW: "));
+        DBG.println(AP_PASSWORD);
+        DBG.print(F("IP: "));
+        DBG.println(IP_AP);
+        DBG.println(F("\nFreezing..."));
+
       if (displayConnected) 
       {
         display.clearDisplay();
@@ -552,7 +563,7 @@ void task_rtk_server_connection(void *pvParameters)
         display.print(F("Go to access point: "));
         display.setCursor(0,30);
         display.print(F("SSID: "));
-        display.print(DEVICE_TYPE);
+        display.print(getDeviceName(DEVICE_TYPE).c_str());
         display.setCursor(0,40);
         display.print(F("PW: "));
         display.print(AP_PASSWORD);
@@ -562,7 +573,7 @@ void task_rtk_server_connection(void *pvParameters)
         display.display();
       }
       
-      vTaskDelay(1000);
+      while (!credentialsExists) delay(1000);
     }
 
     String locationMethod = readFile(LittleFS, getPath(PARAM_RTK_LOCATION_METHOD).c_str());
