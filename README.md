@@ -20,7 +20,8 @@ Infrastructure:
 ![plot](./fritzing/RTKBaseStation_bb.jpg)
 
 ### Caster connection
-To connect to a caster you need to create a CasterSecrets.h file with your credentials that looks like this:
+To connect to a caster without using the web form provided by the submodule RTBaseManager, 
+you need to create a CasterSecrets.h file with your credentials that looks like this:
 
 ````
 #ifndef RTK_CASTER_SECRETS_H
